@@ -231,7 +231,7 @@
       },
       "thankYouDonationModal": {
         "title": "Köszönjük az adományt!",
-        "content": "Értékeljük a segítséged.<br/>Ez az adomány is segít jobbá tenni a ParsiCoint.",
+        "content": "Értékeljük a segítséged. Ez az adomány is segít jobbá tenni a ParsiCoint.",
         "confirmText": "OK"
       },
       "transferSentModal": {

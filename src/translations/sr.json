@@ -232,7 +232,7 @@
       },
       "thankYouDonationModal": {
         "title": "Хвала вам на донацији!",
-        "content": "Ваша помоћ је добродошла.<br/>Ваша донација ће помоћи при даљем развитку ParsiCoin-ја",
+        "content": "Ваша помоћ је добродошла. Ваша донација ће помоћи при даљем развитку ParsiCoin-ја",
         "confirmText": "Затвори"
       },
       "transferSentModal": {

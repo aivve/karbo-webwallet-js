@@ -173,7 +173,7 @@
 	  "subtitle":"Help to fund the development and pay the bills",
 	  "webwalletBlock":{
 		"title":"Webwallet",
-		"content":"This Web wallet is developed by ParsiCoin Devs on his free time.<br/>If you want to help the development, help to pay for the servers, and like this app, please consider a donation: <br/><br/>"
+		"content":"This Web wallet is developed by ParsiCoin Devs.<br/>If you want to help the development, please consider a donation: <br/><br/>"
 	  },
 	  "masariFundBlock":{
 		"title":"ParsiCoin Dev fund",
@@ -231,7 +231,7 @@
 	  },
 	  "thankYouDonationModal":{
 		"title":"Thank you for your donation!",
-		"content":"Your help is appreciated. <br/>This donation will help make ParsiCoin better",
+		"content":"Your help is appreciated. This donation will help make ParsiCoin better",
 		"confirmText":"OK"
 	  },
 	  "transferSentModal":{

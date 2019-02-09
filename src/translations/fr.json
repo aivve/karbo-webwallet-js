@@ -231,7 +231,7 @@
       },
       "thankYouDonationModal": {
         "title": "Merci pour votre donation !",
-        "content": "Votre aide est apprécié. <br/>Cette donation contribuera à améliorer ParsiCoin",
+        "content": "Votre aide est apprécié. Cette donation contribuera à améliorer ParsiCoin",
         "confirmText": "Fermer"
       },
       "transferSentModal": {
