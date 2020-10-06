@@ -343,10 +343,13 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
             }
 
             let blockHeights: number[] = [];
-            let c = tempHeight - startBlock + 1, th = tempHeight;
-            while ( c-- ) {
-                blockHeights[c] = th--
-            }
+            //let c = tempHeight - startBlock + 1, th = tempHeight;
+            //while ( c-- ) {
+            //    blockHeights[c] = th--
+            //}
+
+            blockHeights.push(startBlock);
+            blockHeights.push(tempHeight);
 
             self.postData(config.nodeUrl + 'json_rpc', {
                 "jsonrpc": "2.0",
@@ -356,7 +359,7 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
                     "heights": blockHeights,
                     "include_miner_txs": checkMinerTx,
                     "exclude_signatures": true,
-                    "range": false
+                    "range": true
                 }
             }).then(data => {
                 transactions = data.result.transactions;
