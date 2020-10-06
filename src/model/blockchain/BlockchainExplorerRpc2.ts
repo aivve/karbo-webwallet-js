@@ -254,15 +254,16 @@ export class WalletWatchdog {
                 let startBlock = Math.floor(self.lastBlockLoading / 100) * 100;
                 //console.log('=>',self.lastBlockLoading, endBlock, height, startBlock, self.lastBlockLoading);
                 //console.log('load block from ' + startBlock);
-                self.explorer.getTransactionsForBlocks(previousStartBlock).then(function (transactions: RawDaemonTransaction[]) {
+                self.explorer.getTransactionsForBlocks(previousStartBlock, self.wallet.options.checkMinerTx).then(function (transactions: RawDaemonTransaction[]) {
                     //to ensure no pile explosion
                     if (transactions.length > 0) {
                         let lastTx = transactions[transactions.length - 1];
                         if (typeof lastTx.blockIndex !== 'undefined') {
                             self.lastBlockLoading = lastTx.blockIndex + 1;
                         }
+
+                        self.processTransactions(transactions);
                     }
-                    self.processTransactions(transactions);
 
                     setTimeout(function () {
                         self.loadHistory();
@@ -328,7 +329,7 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
         return watchdog;
     }
 
-    getTransactionsForBlocks(start_block: number): Promise<RawDaemonTransaction[]> {
+    getTransactionsForBlocks(start_block: number, checkMinerTx: boolean): Promise<RawDaemonTransaction[]> {
         let self = this;
         let transactions: RawDaemonTransaction[] = [];
         let startBlock = Number(start_block);
@@ -350,18 +351,15 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
             self.postData(config.nodeUrl + 'json_rpc', {
                 "jsonrpc": "2.0",
                 "id": 0,
-                "method": "getblocksbyheights",
+                "method": "gettransactionsbyheights",
                 "params": {
-                    "blockHeights": blockHeights
+                    "heights": blockHeights,
+                    "include_miner_txs": checkMinerTx,
+                    "exclude_signatures": true,
+                    "range": false
                 }
             }).then(data => {
-                for (let i = 0; i < data.result.blocks.length; i++) {
-                    let finalTxs: any[] = data.result.blocks[i].transactions;
-                    for (let j = 0; j < finalTxs.length; j++) {
-                        let finalTx = finalTxs[j];
-                        transactions.push(finalTx);
-                    }
-                }
+                transactions = data.result.transactions;
                 resolve(transactions);
             }).catch(error => {
                 console.log('REJECT');
@@ -440,7 +438,7 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
                 } while (selectedIndex === -1 || randomBlocksIndexesToGet.indexOf(selectedIndex) !== -1);
                 randomBlocksIndexesToGet.push(selectedIndex);
 
-                let promise = self.getTransactionsForBlocks(Math.floor(selectedIndex / 100) * 100).then(function (rawTransactions: RawDaemonTransaction[]) {
+                let promise = self.getTransactionsForBlocks(Math.floor(selectedIndex / 100) * 100, false).then(function (rawTransactions: RawDaemonTransaction[]) {
                     txs.push.apply(txs, rawTransactions);
                 });
                 promises.push(promise);
