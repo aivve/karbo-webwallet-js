@@ -332,24 +332,24 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
     getTransactionsForBlocks(start_block: number, checkMinerTx: boolean): Promise<RawDaemonTransaction[]> {
         let self = this;
         let transactions: RawDaemonTransaction[] = [];
-        let startBlock = Number(start_block);
+        let startHeight = Number(start_block);
         return new Promise<RawDaemonTransaction[]>(function (resolve, reject) {
-            let tempHeight;
+            let endHeight: number;
             let operator = 10;
-            if (self.heightCache - startBlock > operator) {
-                tempHeight = startBlock + operator;
+            if (self.heightCache - startHeight > operator) {
+                endHeight = startHeight + operator;
             } else {
-                tempHeight = self.heightCache;
+                endHeight = self.heightCache - 1;
             }
 
             let blockHeights: number[] = [];
-            //let c = tempHeight - startBlock + 1, th = tempHeight;
+            //let c = endHeight - startHeight, th = endHeight;
             //while ( c-- ) {
             //    blockHeights[c] = th--
             //}
 
-            blockHeights.push(startBlock);
-            blockHeights.push(tempHeight);
+            blockHeights.push(startHeight);
+            blockHeights.push(endHeight);
 
             self.postData(config.nodeUrl + 'json_rpc', {
                 "jsonrpc": "2.0",
@@ -363,6 +363,11 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
                 }
             }).then(data => {
                 transactions = data.result.transactions;
+
+                if (transactions.length === 0) {
+                    this.lastBlockLoading = endHeight;
+                }
+
                 resolve(transactions);
             }).catch(error => {
                 console.log('REJECT');
