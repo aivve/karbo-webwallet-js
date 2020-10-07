@@ -251,9 +251,7 @@ export class WalletWatchdog {
 
             if (self.lastBlockLoading !== height) {
                 let previousStartBlock = Number(self.lastBlockLoading);
-                let startBlock = Math.floor(self.lastBlockLoading / 100) * 100;
-                //console.log('=>',self.lastBlockLoading, endBlock, height, startBlock, self.lastBlockLoading);
-                //console.log('load block from ' + startBlock);
+                //console.log('load block from ' + previousStartBlock);
                 self.explorer.getTransactionsForBlocks(previousStartBlock, self.wallet.options.checkMinerTx).then(function (transactions: RawDaemonTransaction[]) {
                     //to ensure no pile explosion
                     if (transactions.length > 0) {
@@ -263,16 +261,19 @@ export class WalletWatchdog {
                         }
 
                         self.processTransactions(transactions);
-                    } else {
-                        if (!self.wallet.options.checkMinerTx) {
-                            console.log('No transactions in the batch, coinbase excluded');
-                        }
-                        self.lastBlockLoading += config.syncBlockCount;
-                    }
 
-                    setTimeout(function () {
-                        self.loadHistory();
-                    }, 1);
+                        setTimeout(function () {
+                            self.loadHistory();
+                        }, 1);
+                    } else {
+                        //if (!self.wallet.options.checkMinerTx) {
+                        //    console.log('No transactions in the batch, coinbase excluded');
+                        //}
+
+                        setTimeout(function () {
+                            self.loadHistory();
+                        }, 30 * 1000);
+                    }
                 }).catch(function () {
                     setTimeout(function () {
                         self.loadHistory();
@@ -347,13 +348,10 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
             }
 
             let blockHeights: number[] = [];
-            //let c = endHeight - startHeight, th = endHeight;
-            //while ( c-- ) {
-            //    blockHeights[c] = th--
-            //}
-
-            blockHeights.push(startHeight);
-            blockHeights.push(endHeight);
+            let c = endHeight - startHeight, th = endHeight;
+            while ( c-- ) {
+                blockHeights[c] = th--
+            }
 
             self.postData(config.nodeUrl + 'json_rpc', {
                 "jsonrpc": "2.0",
@@ -363,7 +361,7 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
                     "heights": blockHeights,
                     "include_miner_txs": checkMinerTx,
                     "exclude_signatures": true,
-                    "range": true
+                    "range": false
                 }
             }).then(data => {
                 transactions = data.result.transactions;
