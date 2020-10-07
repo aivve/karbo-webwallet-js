@@ -366,6 +366,9 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
 
                 if (transactions.length === 0) {
                     this.lastBlockLoading = endHeight;
+                    if (checkMinerTx) {
+                        console.log('No transactions in the batch ' + startHeight + ' - ' + endHeight + ', coinbase excluded');
+                    }
                 }
 
                 resolve(transactions);
