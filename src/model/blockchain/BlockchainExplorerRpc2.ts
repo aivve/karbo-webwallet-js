@@ -178,7 +178,7 @@ export class WalletWatchdog {
 
         //we destroy the worker in charge of decoding the transactions every 250 transactions to ensure the memory is not corrupted
         //cnUtil bug, see https://github.com/mymonero/mymonero-core-js/issues/8
-        if (this.workerCountProcessed >= 100) {
+        if (this.workerCountProcessed >= 250) {
             //console.log('Recreate worker..');
             this.terminateWorker();
             this.initWorker();
@@ -263,6 +263,11 @@ export class WalletWatchdog {
                         }
 
                         self.processTransactions(transactions);
+                    } else {
+                        if (!self.wallet.options.checkMinerTx) {
+                            console.log('No transactions in the batch, coinbase excluded');
+                        }
+                        self.lastBlockLoading += config.syncBlockCount;
                     }
 
                     setTimeout(function () {
@@ -335,9 +340,8 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
         let startHeight = Number(start_block);
         return new Promise<RawDaemonTransaction[]>(function (resolve, reject) {
             let endHeight: number;
-            let operator = 10;
-            if (self.heightCache - startHeight > operator) {
-                endHeight = startHeight + operator;
+            if (self.heightCache - startHeight > config.syncBlockCount) {
+                endHeight = startHeight + config.syncBlockCount;
             } else {
                 endHeight = self.heightCache - 1;
             }
@@ -363,14 +367,6 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
                 }
             }).then(data => {
                 transactions = data.result.transactions;
-
-                if (transactions.length === 0) {
-                    this.lastBlockLoading = endHeight;
-                    if (checkMinerTx) {
-                        console.log('No transactions in the batch ' + startHeight + ' - ' + endHeight + ', coinbase excluded');
-                    }
-                }
-
                 resolve(transactions);
             }).catch(error => {
                 console.log('REJECT');

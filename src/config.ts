@@ -37,6 +37,7 @@ global.config = {
 
 	idleTimeout: 30,
 	idleWarningDuration: 20,
+	syncBlockCount: 10,
 
 	coinSymbol: 'KRB',
 	openAliasPrefix: "krb",
