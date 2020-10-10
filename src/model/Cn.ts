@@ -206,7 +206,12 @@ export namespace CnUtils{
 
 	//integer (string) to scalar
 	export function d2s(integer : number|string){
-		return CnUtils.swapEndian(CnUtils.d2h(integer));
+		if (typeof integer === "string") {
+			return CnUtils.swapEndian(CnUtils.d2h(integer));
+		} else {
+			return CnUtils.swapEndian(CnUtils.d2h(integer.toString()));
+		}
+
 	}
 
 	// hexadecimal to integer
