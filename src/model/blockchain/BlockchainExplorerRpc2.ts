@@ -249,7 +249,7 @@ export class WalletWatchdog {
             //console.log(self.lastBlockLoading,height);
             if (height > self.lastMaximumHeight) self.lastMaximumHeight = height;
 
-            if (self.lastBlockLoading !== height) {
+            if (self.lastBlockLoading !== height - 1) {
                 let previousStartBlock = Number(self.lastBlockLoading);
                 let startBlock = Math.floor(self.lastBlockLoading / 100) * 100;
                 //console.log('=>',self.lastBlockLoading, endBlock, height, startBlock, self.lastBlockLoading);
