@@ -249,7 +249,7 @@ export class WalletWatchdog {
             //console.log(self.lastBlockLoading,height);
             if (height > self.lastMaximumHeight) self.lastMaximumHeight = height;
 
-            if (self.lastBlockLoading !== height) {
+            if (self.lastBlockLoading !== height - 1) {
                 let previousStartBlock = Number(self.lastBlockLoading);
                 //console.log('load block from ' + previousStartBlock);
                 self.explorer.getTransactionsForBlocks(previousStartBlock, self.wallet.options.checkMinerTx).then(function (transactions: RawDaemonTransaction[]) {
