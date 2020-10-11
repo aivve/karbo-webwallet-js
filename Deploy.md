@@ -21,9 +21,6 @@ That's all
 
 # Deploy
 All the content of the src directory needs to be exposed with a web-server.
-You will also need to expose the content of the src_api content to an endpoint which can interpret PHP.
-By default the configuration looks at domainname.com/api/
-
 
 # Permissions
 The API stores precomputed data for performances in a directory called cache/ in the same directory of the API code (PHP code).
