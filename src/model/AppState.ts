@@ -134,7 +134,7 @@ export class AppState{
 
 										let promisesBlocks = [];
 										for (let height of blockchainHeightToRescan) {
-											promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height)));
+											promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height), wallet.options.checkMinerTx));
 										}
 										Promise.all(promisesBlocks).then(function (arrayOfTxs: Array<RawDaemonTransaction[]>) {
 											for (let txs of arrayOfTxs) {
