@@ -60,7 +60,7 @@ export class WalletWatchdog {
                         self.signalWalletUpdate();
                     }
                     if (self.workerCurrentProcessing.length > 0) {
-                        let transactionHeight = self.workerCurrentProcessing[self.workerCurrentProcessing.length - 1].blockIndex;
+                        let transactionHeight = self.workerCurrentProcessing[self.workerCurrentProcessing.length - 1].blockIndex; // FIXME
                         if (typeof transactionHeight !== 'undefined')
                             self.wallet.lastHeight = transactionHeight;
                     }
@@ -74,6 +74,8 @@ export class WalletWatchdog {
     signalWalletUpdate() {
         let self = this;
         this.lastBlockLoading = -1;//reset scanning
+        this.lastBlockLoadingHash = "";
+        this.lastBlockLoadingTimestamp = 0;
 
         if (this.wallet.options.customNode) {
             config.nodeUrl = this.wallet.options.nodeUrl;
@@ -163,6 +165,7 @@ export class WalletWatchdog {
         }
         if (this.transactionsToProcess.length == 0) {
             this.wallet.lastHeight = this.lastBlockLoading;
+            this.wallet.lastHash = this.lastBlockLoadingHash;
         }
     }
 
@@ -204,7 +207,7 @@ export class WalletWatchdog {
         let transactionsToAdd = [];
 
         for (let tr of transactions) {
-            if (typeof tr.blockIndex !== 'undefined')
+            if (typeof tr.blockIndex !== 'undefined') // FIXME
                 if (tr.blockIndex > this.wallet.lastHeight) {
                     transactionsToAdd.push(tr);
                 }
@@ -222,12 +225,18 @@ export class WalletWatchdog {
 
 
     lastBlockLoading = -1;
+    lastBlockLoadingHash = "";
+    lastBlockLoadingTimestamp = 0;
     lastMaximumHeight = 0;
 
     loadHistory() {
         if (this.stopped) return;
 
-        if (this.lastBlockLoading === -1) this.lastBlockLoading = this.wallet.lastHeight;
+        if (this.lastBlockLoading === -1) {
+            this.lastBlockLoading = this.wallet.lastHeight;
+            this.lastBlockLoadingHash = this.wallet.lastHash;
+            this.lastBlockLoadingTimestamp = this.wallet.lastTimestamp;
+        }
         let self = this;
         //don't reload until it's finished processing the last batch of transactions
         if (this.workerProcessingWorking || !this.workerProcessingReady) {
@@ -251,15 +260,20 @@ export class WalletWatchdog {
 
             if (self.lastBlockLoading !== height - 1) {
                 let previousStartBlock = Number(self.lastBlockLoading);
-                let startBlock = Math.floor(self.lastBlockLoading / 100) * 100;
-                //console.log('=>',self.lastBlockLoading, endBlock, height, startBlock, self.lastBlockLoading);
-                //console.log('load block from ' + startBlock);
-                self.explorer.getTransactionsForBlocks(previousStartBlock).then(function (transactions: RawDaemonTransaction[]) {
+                let previousStartBlockHash = self.lastBlockLoadingHash;
+                let previousStartBlockTimestamp = self.lastBlockLoadingTimestamp;
+                self.explorer.getTransactionsForBlocks(previousStartBlock, previousStartBlockHash, previousStartBlockTimestamp).then(function (transactions: RawDaemonTransaction[]) {
                     //to ensure no pile explosion
                     if (transactions.length > 0) {
                         let lastTx = transactions[transactions.length - 1];
                         if (typeof lastTx.blockIndex !== 'undefined') {
-                            self.lastBlockLoading = lastTx.blockIndex + 1;
+                            self.lastBlockLoading = lastTx.blockIndex;
+                        }
+                        if (typeof lastTx.blockHash !== 'undefined') {
+                            self.lastBlockLoadingHash = lastTx.blockHash;
+                        }
+                        if (typeof lastTx.timestamp !== 'undefined') {
+                            self.lastBlockLoadingTimestamp = lastTx.timestamp;
                         }
                     }
                     self.processTransactions(transactions);
@@ -292,6 +306,50 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
     // testnet : boolean = true;
     randInt = Math.floor(Math.random() * Math.floor(config.apiUrl.length));
     serverAddress = config.apiUrl[this.randInt];
+
+
+    protected makeRpcRequest(method: string, params: any = {}): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            $.ajax({
+                url: config.nodeUrl + 'json_rpc',
+                method: 'POST',
+                data: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: method,
+                    params: params,
+                    id: 0
+                }),
+                contentType: 'application/json'
+            }).done(function (raw: any) {
+                if (
+                    typeof raw.id === 'undefined' ||
+                    typeof raw.jsonrpc === 'undefined' ||
+                    raw.jsonrpc !== '2.0' ||
+                    typeof raw.result !== 'object'
+                )
+                    reject('Daemon response is not properly formatted');
+                else
+                    resolve(raw.result);
+            }).fail(function (data: any) {
+                reject(data);
+            });
+        });
+    }
+
+    protected makeRequest(method: 'GET' | 'POST', url: string, body: any = undefined): Promise<any> {
+        return new Promise<any>((resolve, reject) => {
+            $.ajax({
+                url: config.nodeUrl + url,
+                method: method,
+                data: typeof body === 'string' ? body : JSON.stringify(body)
+            }).done(function (raw: any) {
+                resolve(raw);
+            }).fail(function (data: any) {
+                reject(data);
+            });
+        });
+    }
+
 
     heightCache = 0;
     heightLastTimeRetrieve = 0;
@@ -328,49 +386,31 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
         return watchdog;
     }
 
-    getTransactionsForBlocks(start_block: number): Promise<RawDaemonTransaction[]> {
+    getTransactionsForBlocks(start_block: number, start_hash: string, timestamp: number): Promise<RawDaemonTransaction[]> {
         let self = this;
         let transactions: RawDaemonTransaction[] = [];
         let startBlock = Number(start_block);
+        let startHash = start_hash;
+        let genesisHash = "3125b79e4a42f8d4d2fc4dffea8442e185ebda940ecd4d3b449056a4ea0efea4";
+        let blockHashes: string[] = [];
+        blockHashes.push(genesisHash);
+        blockHashes.push(startHash);
+
         return new Promise<RawDaemonTransaction[]>(function (resolve, reject) {
-            let tempHeight;
-            let operator = 10;
-            if (self.heightCache - startBlock > operator) {
-                tempHeight = startBlock + operator;
-            } else {
-                tempHeight = self.heightCache;
-            }
 
-            let blockHeights: number[] = [];
-            let c = tempHeight - startBlock + 1, th = tempHeight;
-            while ( c-- ) {
-                blockHeights[c] = th--
-            }
+            $.ajax({
+                url: config.nodeUrl + 'queryblockslite',
+                method: 'POST',
+                data: JSON.stringify({
+                    "blockIds": blockHashes,
+                    "timestamp": timestamp
+                })
+            }).done(function (raw: any) {
 
-            self.postData(config.nodeUrl + 'json_rpc', {
-                "jsonrpc": "2.0",
-                "id": 0,
-                "method": "getblocksbyheights",
-                "params": {
-                    "blockHeights": blockHeights
-                }
-            }).then(data => {
-                for (let i = 0; i < data.result.blocks.length; i++) {
-                    let finalTxs: any[] = data.result.blocks[i].transactions;
-                    for (let j = 0; j < finalTxs.length; j++) {
-                        let finalTx = finalTxs[j];
-                        transactions.push(finalTx);
-                    }
-                }
-                resolve(transactions);
-            }).catch(error => {
-                console.log('REJECT');
-                try {
-                    console.log(JSON.parse(error.responseText));
-                } catch (e) {
-                    console.log(e);
-                }
-                reject(error);
+                let RawTxs = raw.items;
+
+            }).fail(function (data: any) {
+                reject(data);
             });
 
         });
