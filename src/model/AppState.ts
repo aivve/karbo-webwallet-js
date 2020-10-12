@@ -134,7 +134,7 @@ export class AppState{
 
 										let promisesBlocks = [];
 										for (let height of blockchainHeightToRescan) {
-											promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height), wallet.options.checkMinerTx));
+											promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height)));
 										}
 										Promise.all(promisesBlocks).then(function (arrayOfTxs: Array<RawDaemonTransaction[]>) {
 											for (let txs of arrayOfTxs) {
@@ -167,16 +167,15 @@ export class AppState{
 									reject();
 								}
 							});
-						}else {
+						} else {
 							swal.close();
 							window.location.href = '#account';
 						}
-					}else
+					} else
 						reject();
 				},1);
 			});
 		});
 	}
-
 
 }
