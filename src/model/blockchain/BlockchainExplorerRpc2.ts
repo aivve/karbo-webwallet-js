@@ -13,12 +13,278 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {BlockchainExplorer, NetworkInfo, RawDaemon_Transaction, RemoteNodeInformation} from "./BlockchainExplorer";
-import {Wallet} from "../Wallet";
-import {MathUtil} from "../MathUtil";
-import {CnTransactions, CnUtils} from "../Cn";
-import {Transaction} from "../Transaction";
-import {WalletWatchdog} from "../WalletWatchdog";
+import { BlockchainExplorer } from "./BlockchainExplorer";
+import { Wallet } from "../Wallet";
+import { TransactionsExplorer, TX_EXTRA_TAG_PUBKEY } from "../TransactionsExplorer";
+import { Transaction } from "../Transaction";
+import { MathUtil } from "../MathUtil";
+
+export class WalletWatchdog {
+
+    wallet: Wallet;
+    explorer: BlockchainExplorerRpc2;
+
+    constructor(wallet: Wallet, explorer: BlockchainExplorerRpc2) {
+        this.wallet = wallet;
+        this.explorer = explorer;
+
+        this.initWorker();
+        this.initMempool();
+    }
+
+    initWorker() {
+        let self = this;
+        if (this.wallet.options.customNode) {
+            config.nodeUrl = this.wallet.options.nodeUrl;
+        } else {
+            let randNodeInt:number = Math.floor(Math.random() * Math.floor(config.nodeList.length));
+            config.nodeUrl = config.nodeList[randNodeInt];
+        }
+
+        this.workerProcessing = new Worker('./workers/TransferProcessingEntrypoint.js');
+        this.workerProcessing.onmessage = function (data: MessageEvent) {
+            let message: string | any = data.data;
+            //console.log("InitWorker message: ");
+            //console.log(message);
+            if (message === 'ready') {
+                self.signalWalletUpdate();
+            } else if (message === 'readyWallet') {
+                self.workerProcessingReady = true;
+            } else if (message.type) {
+                if (message.type === 'processed') {
+                    let transactions = message.transactions;
+                    if (transactions.length > 0) {
+                        for (let tx of transactions)
+                            self.wallet.addNew(Transaction.fromRaw(tx));
+                        self.signalWalletUpdate();
+                    }
+                    if (self.workerCurrentProcessing.length > 0) {
+                        let transactionHeight = self.workerCurrentProcessing[self.workerCurrentProcessing.length - 1].blockIndex;
+                        if (typeof transactionHeight !== 'undefined')
+                            self.wallet.lastHeight = transactionHeight;
+                    }
+
+                    self.workerProcessingWorking = false;
+                }
+            }
+        };
+    }
+
+    signalWalletUpdate() {
+        let self = this;
+        this.lastBlockLoading = -1;//reset scanning
+
+        if (this.wallet.options.customNode) {
+            config.nodeUrl = this.wallet.options.nodeUrl;
+        } else {
+            let randNodeInt:number = Math.floor(Math.random() * Math.floor(config.nodeList.length));
+            config.nodeUrl = config.nodeList[randNodeInt];
+        }
+
+        this.workerProcessing.postMessage({
+            type: 'initWallet',
+            wallet:this.wallet.exportToRaw()
+        });
+        clearInterval(this.intervalTransactionsProcess);
+        this.intervalTransactionsProcess = <any>setInterval(function () {
+            self.checkTransactionsInterval();
+        }, this.wallet.options.readSpeed);
+    }
+
+    intervalMempool = 0;
+    initMempool() {
+        let self = this;
+        if (this.intervalMempool === 0) {
+            this.intervalMempool = <any>setInterval(function () {
+                self.checkMempool();
+            }, 30 * 1000);
+        }
+        self.checkMempool();
+    }
+
+    stopped: boolean = false;
+
+    stop() {
+        clearInterval(this.intervalTransactionsProcess);
+        this.transactionsToProcess = [];
+        clearInterval(this.intervalMempool);
+        this.stopped = true;
+    }
+
+    checkMempool(): boolean {
+        let self = this;
+        if (this.lastMaximumHeight - this.lastBlockLoading > 1) {//only check memory pool if the user is up to date to ensure outs & ins will be found in the wallet
+            return false;
+        }
+
+        this.wallet.txsMem = [];
+        this.explorer.getTransactionPool().then(function (pool: any) {
+            if (typeof pool !== 'undefined')
+                for (let rawTx of pool) {
+                    let tx = TransactionsExplorer.parse(rawTx, self.wallet);
+                    if (tx !== null) {
+                        self.wallet.txsMem.push(tx);
+                    }
+                }
+        }).catch(function () { });
+        return true;
+    }
+
+    terminateWorker() {
+        this.workerProcessing.terminate();
+        this.workerProcessingReady = false;
+        this.workerCurrentProcessing = [];
+        this.workerProcessingWorking = false;
+        this.workerCountProcessed = 0;
+    }
+
+    transactionsToProcess: RawDaemonTransaction[] = [];
+    intervalTransactionsProcess = 0;
+
+    workerProcessing !: Worker;
+    workerProcessingReady = false;
+    workerProcessingWorking = false;
+    workerCurrentProcessing: RawDaemonTransaction[] = [];
+    workerCountProcessed = 0;
+
+    checkTransactions(rawTransactions: RawDaemonTransaction[]) {
+        for (let rawTransaction of rawTransactions) {
+            let height = rawTransaction.blockIndex;
+            if (typeof height !== 'undefined') {
+                let transaction = TransactionsExplorer.parse(rawTransaction, this.wallet);
+                if (transaction !== null) {
+                    this.wallet.addNew(transaction);
+                }
+                if (height - this.wallet.lastHeight >= 2) {
+                    this.wallet.lastHeight = height - 1;
+                }
+            }
+        }
+        if (this.transactionsToProcess.length == 0) {
+            this.wallet.lastHeight = this.lastBlockLoading;
+        }
+    }
+
+    checkTransactionsInterval() {
+
+        //somehow we're repeating and regressing back to re-process Tx's
+        //loadHistory getting into a stack overflow ?
+        //need to work out timinings and ensure process does not reload when it's already running...
+
+        if (this.workerProcessingWorking || !this.workerProcessingReady) {
+            return;
+        }
+
+        //we destroy the worker in charge of decoding the transactions every 250 transactions to ensure the memory is not corrupted
+        //cnUtil bug, see https://github.com/mymonero/mymonero-core-js/issues/8
+        if (this.workerCountProcessed >= 100) {
+            //console.log('Recreate worker..');
+            this.terminateWorker();
+            this.initWorker();
+            return;
+        }
+
+        let transactionsToProcess: RawDaemonTransaction[] = this.transactionsToProcess.splice(0, 25); //process 25 tx's at a time
+        if (transactionsToProcess.length > 0) {
+            this.workerCurrentProcessing = transactionsToProcess;
+            this.workerProcessing.postMessage({
+                type: 'process',
+                transactions: transactionsToProcess
+            });
+            ++this.workerCountProcessed;
+            this.workerProcessingWorking = true;
+        } else {
+            clearInterval(this.intervalTransactionsProcess);
+            this.intervalTransactionsProcess = 0;
+        }
+    }
+
+    processTransactions(transactions: RawDaemonTransaction[]) {
+        let transactionsToAdd = [];
+
+        for (let tr of transactions) {
+            if (typeof tr.blockIndex !== 'undefined')
+                if (tr.blockIndex > this.wallet.lastHeight) {
+                    transactionsToAdd.push(tr);
+                }
+        }
+
+        this.transactionsToProcess.push.apply(this.transactionsToProcess, transactionsToAdd);
+        if (this.intervalTransactionsProcess === 0) {
+            let self = this;
+            this.intervalTransactionsProcess = <any>setInterval(function () {
+                self.checkTransactionsInterval();
+            }, this.wallet.options.readSpeed);
+        }
+
+    }
+
+
+    lastBlockLoading = -1;
+    lastMaximumHeight = 0;
+
+    loadHistory() {
+        if (this.stopped) return;
+
+        if (this.lastBlockLoading === -1) this.lastBlockLoading = this.wallet.lastHeight;
+        let self = this;
+        //don't reload until it's finished processing the last batch of transactions
+        if (this.workerProcessingWorking || !this.workerProcessingReady) {
+            setTimeout(function () {
+                self.loadHistory();
+            }, 100);
+            return;
+        }
+        if (this.transactionsToProcess.length > 100) {
+            //to ensure no pile explosion
+            setTimeout(function () {
+                self.loadHistory();
+            }, 2 * 1000);
+            return;
+        }
+
+        //console.log('checking');
+        this.explorer.getHeight().then(function (height) {
+            //console.log(self.lastBlockLoading,height);
+            if (height > self.lastMaximumHeight) self.lastMaximumHeight = height;
+
+            if (self.lastBlockLoading !== height - 1) {
+                let previousStartBlock = Number(self.lastBlockLoading);
+                let startBlock = Math.floor(self.lastBlockLoading / 100) * 100;
+                //console.log('=>',self.lastBlockLoading, endBlock, height, startBlock, self.lastBlockLoading);
+                //console.log('load block from ' + startBlock);
+                self.explorer.getTransactionsForBlocks(previousStartBlock).then(function (transactions: RawDaemonTransaction[]) {
+                    //to ensure no pile explosion
+                    if (transactions.length > 0) {
+                        let lastTx = transactions[transactions.length - 1];
+                        if (typeof lastTx.blockIndex !== 'undefined') {
+                            self.lastBlockLoading = lastTx.blockIndex + 1;
+                        }
+                    }
+                    self.processTransactions(transactions);
+
+                    setTimeout(function () {
+                        self.loadHistory();
+                    }, 1);
+                }).catch(function () {
+                    setTimeout(function () {
+                        self.loadHistory();
+                    }, 30 * 1000);//retry 30s later if an error occurred
+                });
+            } else {
+                setTimeout(function () {
+                    self.loadHistory();
+                }, 30 * 1000);
+            }
+        }).catch(function () {
+            setTimeout(function () {
+                self.loadHistory();
+            }, 30 * 1000);//retry 30s later if an error occurred
+        });
+    }
+
+
+}
 
 export class BlockchainExplorerRpc2 implements BlockchainExplorer {
 
