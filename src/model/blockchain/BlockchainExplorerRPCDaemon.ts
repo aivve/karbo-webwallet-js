@@ -21,35 +21,35 @@ import {Transaction} from "../Transaction";
 import {WalletWatchdog} from "../WalletWatchdog";
 
 export type DaemonResponseGetInfo = {
-    "alt_blocks_count": number,
-    "block_size_limit": number,
-    "block_size_median": number,
-    "bootstrap_daemon_address": string,
+    "already_generated_coins": number,
+    "block_major_version": number,
+    "contact": string,
     "cumulative_difficulty": number,
-    "cumulative_weight": number,
     "difficulty": number,
     "fee_address": string,
-    "free_space": number,
     "grey_peerlist_size": number,
     "height": number,
     "height_without_bootstrap": number,
+    "is_synchronized": boolean,
     "incoming_connections_count": number,
-    "mainnet": boolean,
-    "offline": boolean,
     "outgoing_connections_count": number,
+    "last_known_block_index": number,
+    "min_fee": number,
+    "next_reward": number,
     "rpc_connections_count": number,
-    "stagenet": boolean,
     "start_time": number,
     "status": "OK" | string,
     "target": number,
-    "target_height": number,
-    "testnet": boolean,
     "top_block_hash": string,
-    "tx_count": number,
-    "tx_pool_size": number,
-    "untrusted": boolean,
-    "was_bootstrap_ever_used": boolean,
+    "transactions_count": number,
+    "transactions_pool_size": number,
     "white_peerlist_size": number
+}
+
+export type DaemonResponseGetNodeFeeInfo = {
+    fee_address: string,
+    fee_amount: number,
+    status: "OK" | string
 }
 
 export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
@@ -360,6 +360,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     }
 
     getRemoteNodeInformation(): Promise<RemoteNodeInformation> {
+        // TODO change to /feeaddress
         return this.getInfo().then((info: DaemonResponseGetInfo) => {
             return {
                 'fee_address': info['fee_address'],
