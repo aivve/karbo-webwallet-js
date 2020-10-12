@@ -58,8 +58,6 @@ export type RawWallet = {
 	transactions : any[],
 	txPrivateKeys?:any,
 	lastHeight : number,
-	lastHash : string,
-	lastTimestamp : number,
 	encryptedKeys?:string|Array<number>,
 	nonce:string,
 	keys?:UserKeys,
@@ -77,8 +75,6 @@ export class Wallet extends Observable{
 	// lastHeight : number = 75900;
 	// private _lastHeight : number = 50000;
 	private _lastHeight : number = 0;
-	private _lastHash : string = "";
-	private _lastTimestamp : number = 0;
 
 	private transactions : Transaction[] = [];
 	txsMem : Transaction[] = [];
@@ -101,8 +97,6 @@ export class Wallet extends Observable{
 			transactions: transactions,
 			txPrivateKeys:this.txPrivateKeys,
 			lastHeight: this._lastHeight,
-			lastHash: this._lastHash;
-			lastTimestamp: this._lastTimestamp;
 			nonce:'',
 			options : this._options,
 			coinAddressPrefix:this.coinAddressPrefix
@@ -122,8 +116,6 @@ export class Wallet extends Observable{
 			wallet.transactions.push(Transaction.fromRaw(rawTransac));
 		}
 		wallet._lastHeight = raw.lastHeight;
-		wallet._lastHash = raw.lastHash;
-		wallet._lastTimestamp = raw.lastTimestamp;
 		if(typeof raw.encryptedKeys === 'string' && raw.encryptedKeys !== '') {
 			if(raw.encryptedKeys.length === 128) {
 				let privView = raw.encryptedKeys.substr(0, 64);
@@ -174,26 +166,6 @@ export class Wallet extends Observable{
 	set lastHeight(value: number) {
 		let modified = value !== this._lastHeight;
 		this._lastHeight = value;
-		if(modified)this.notify();
-	}
-
-	get lastTimestamp() {
-		return this._lastTimestamp;
-	}
-
-	set lastTimestamp(value: number) {
-		let modified = value !== this._lastTimestamp;
-		this._lastTimestamp = value;
-		if(modified)this.notify();
-	}
-
-	get lastHash(): string {
-		return this._lastHash;
-	}
-
-	set lastHash(value: string) {
-		let modified = value !== this._lastHash;
-		this._lastHash = value;
 		if(modified)this.notify();
 	}
 

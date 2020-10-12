@@ -7,7 +7,7 @@ type Inputs = {
             mixin: number
         },
         output: {
-            number: number,
+            number: number, 
             transactionHash: string
         },
         type: string
@@ -15,7 +15,7 @@ type Inputs = {
 }
 
 type Outputs = {
-    globalIndex: number,
+    globalIndex: number, 
     output: {
         amount: 0,
         target: {
@@ -32,17 +32,28 @@ type Extra = {
     raw: string
 }
 
+type Signatures = {
+    first: number,
+    second: string
+}
+
 type RawDaemonTransaction = {
     extra: Extra,
     outputs: Outputs[],
     inputs: Inputs[],
     fee: number,
+    size: number,
+    mixin: number,
+    version: number,
+    totalInputsAmount: number,
+    totalOutputsAmount: number,
     unlockTime: number,
     blockIndex?: number,
-    blockHash: string,
     timestamp?: number
     hash?: string,
-    paymentId: string
+    paymentId: string,
+	signatures: Signatures,
+	signaturesSize: number
 };
 
 type RawDaemonBlock = any;

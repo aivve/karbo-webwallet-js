@@ -17,6 +17,7 @@ import {BlockchainExplorer, NetworkInfo, RawDaemon_Transaction, RemoteNodeInform
 import {Wallet} from "../Wallet";
 import {MathUtil} from "../MathUtil";
 import {CnTransactions, CnUtils} from "../Cn";
+import {Transaction} from "../Transaction";
 import {WalletWatchdog} from "../WalletWatchdog";
 
 export type DaemonResponseGetInfo = {

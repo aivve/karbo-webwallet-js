@@ -17,6 +17,7 @@ import {BlockchainExplorer, NetworkInfo, RawDaemon_Transaction, RemoteNodeInform
 import {Wallet} from "../Wallet";
 import {MathUtil} from "../MathUtil";
 import {CnTransactions, CnUtils} from "../Cn";
+import {Transaction} from "../Transaction";
 import {WalletWatchdog} from "../WalletWatchdog";
 
 export class BlockchainExplorerRpc2 implements BlockchainExplorer {
@@ -24,50 +25,6 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
     // testnet : boolean = true;
     randInt = Math.floor(Math.random() * Math.floor(config.apiUrl.length));
     serverAddress = config.apiUrl[this.randInt];
-
-
-    protected makeRpcRequest(method: string, params: any = {}): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            $.ajax({
-                url: config.nodeUrl + 'json_rpc',
-                method: 'POST',
-                data: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: method,
-                    params: params,
-                    id: 0
-                }),
-                contentType: 'application/json'
-            }).done(function (raw: any) {
-                if (
-                    typeof raw.id === 'undefined' ||
-                    typeof raw.jsonrpc === 'undefined' ||
-                    raw.jsonrpc !== '2.0' ||
-                    typeof raw.result !== 'object'
-                )
-                    reject('Daemon response is not properly formatted');
-                else
-                    resolve(raw.result);
-            }).fail(function (data: any) {
-                reject(data);
-            });
-        });
-    }
-
-    protected makeRequest(method: 'GET' | 'POST', url: string, body: any = undefined): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            $.ajax({
-                url: config.nodeUrl + url,
-                method: method,
-                data: typeof body === 'string' ? body : JSON.stringify(body)
-            }).done(function (raw: any) {
-                resolve(raw);
-            }).fail(function (data: any) {
-                reject(data);
-            });
-        });
-    }
-
 
     heightCache = 0;
     heightLastTimeRetrieve = 0;
@@ -104,31 +61,49 @@ export class BlockchainExplorerRpc2 implements BlockchainExplorer {
         return watchdog;
     }
 
-    getTransactionsForBlocks(start_block: number, start_hash: string, timestamp: number): Promise<RawDaemonTransaction[]> {
+    getTransactionsForBlocks(start_block: number): Promise<RawDaemonTransaction[]> {
         let self = this;
         let transactions: RawDaemonTransaction[] = [];
         let startBlock = Number(start_block);
-        let startHash = start_hash;
-        let genesisHash = "3125b79e4a42f8d4d2fc4dffea8442e185ebda940ecd4d3b449056a4ea0efea4";
-        let blockHashes: string[] = [];
-        blockHashes.push(genesisHash);
-        blockHashes.push(startHash);
-
         return new Promise<RawDaemonTransaction[]>(function (resolve, reject) {
+            let tempHeight;
+            let operator = 10;
+            if (self.heightCache - startBlock > operator) {
+                tempHeight = startBlock + operator;
+            } else {
+                tempHeight = self.heightCache;
+            }
 
-            $.ajax({
-                url: config.nodeUrl + 'queryblockslite',
-                method: 'POST',
-                data: JSON.stringify({
-                    "blockIds": blockHashes,
-                    "timestamp": timestamp
-                })
-            }).done(function (raw: any) {
+            let blockHeights: number[] = [];
+            let c = tempHeight - startBlock + 1, th = tempHeight;
+            while ( c-- ) {
+                blockHeights[c] = th--
+            }
 
-                let RawTxs = raw.items;
-
-            }).fail(function (data: any) {
-                reject(data);
+            self.postData(config.nodeUrl + 'json_rpc', {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "getblocksbyheights",
+                "params": {
+                    "blockHeights": blockHeights
+                }
+            }).then(data => {
+                for (let i = 0; i < data.result.blocks.length; i++) {
+                    let finalTxs: any[] = data.result.blocks[i].transactions;
+                    for (let j = 0; j < finalTxs.length; j++) {
+                        let finalTx = finalTxs[j];
+                        transactions.push(finalTx);
+                    }
+                }
+                resolve(transactions);
+            }).catch(error => {
+                console.log('REJECT');
+                try {
+                    console.log(JSON.parse(error.responseText));
+                } catch (e) {
+                    console.log(e);
+                }
+                reject(error);
             });
 
         });
