@@ -7,8 +7,8 @@ You also need to build some files that are dynamically generated like the manife
 This task is doable with :
 ```
 npm install
-nodejs ./node_modules/typescript/bin/tsc --project tsconfig.prod.json
-nodejs build.js
+node ./node_modules/typescript/bin/tsc --project tsconfig.prod.json
+node build.js
 ```
 The first task install dependencies (typescript) and the text one compile the typescript code.
 We are using a custom tsconfig file which is optimized for production.

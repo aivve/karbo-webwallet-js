@@ -14,10 +14,10 @@
  */
 
 import {Transaction, TransactionIn, TransactionOut} from "./Transaction";
-import {CryptoUtils} from "./CryptoUtils";
 import {Wallet} from "./Wallet";
 import {MathUtil} from "./MathUtil";
-import {CnUtilNative} from "./CnUtilNative";
+import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
+import hextobin = CnUtils.hextobin;
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
 export const TX_EXTRA_NONCE_MAX_COUNT = 255;
@@ -60,7 +60,7 @@ export class TransactionsExplorer {
 
 		let derivation = null;
 		try {
-			derivation = CnUtilNative.generate_key_derivation(tx_pub_key, wallet.keys.priv.view);
+			derivation = CnNativeBride.generate_key_derivation(tx_pub_key, wallet.keys.priv.view);
 		} catch (e) {
 			//console.log('UNABLE TO CREATE DERIVATION', e);
 			return null;
@@ -75,34 +75,12 @@ export class TransactionsExplorer {
 			let amount = out.output.amount;
 			let output_idx_in_tx = iOut;
 
-			//let generated_tx_pubkey = cnUtil.derive_public_key(derivation,output_idx_in_tx,wallet.keys.pub.spend);//5.5ms
-			let generated_tx_pubkey = CnUtilNative.derive_public_key(derivation,output_idx_in_tx,wallet.keys.pub.spend);//5.5ms
+			let generated_tx_pubkey = CnNativeBride.derive_public_key(derivation, output_idx_in_tx, wallet.keys.pub.spend);
 
 			// check if generated public key matches the current output's key
 			let mine_output = (txout_k.key == generated_tx_pubkey);
 
             if (mine_output) {
-
-				//let minerTx = false;
-
-				//if (amount !== 0) {//miner tx
-				//	minerTx = true;
-				//} else {
-				//	let mask = rawTransaction.rct_signatures.ecdhInfo[output_idx_in_tx].mask;
-				//	let r = CryptoUtils.decode_ringct(rawTransaction.rct_signatures,
-				//		tx_pub_key,
-				//		wallet.keys.priv.view,
-				//		output_idx_in_tx,
-				//		mask,
-				//		amount,
-				//		derivation);
-
-				//	if (r === false)
-				//		console.error("Cant decode ringCT!");
-				//	else
-				//		amount = r;
-				//}
-
 				let transactionOut = new TransactionOut();
 				if (typeof out.globalIndex !== 'undefined')
 					transactionOut.globalIndex = out.globalIndex;
@@ -113,14 +91,9 @@ export class TransactionsExplorer {
 				transactionOut.pubKey = txout_k.key;
 				transactionOut.outputIdx = output_idx_in_tx;
 
-				//if (!minerTx) {
-				//	transactionOut.rtcOutPk = rawTransaction.rct_signatures.outPk[output_idx_in_tx];
-				//	transactionOut.rtcMask = rawTransaction.rct_signatures.ecdhInfo[output_idx_in_tx].mask;
-				//	transactionOut.rtcAmount = rawTransaction.rct_signatures.ecdhInfo[output_idx_in_tx].amount;
-				//}
                 //THIS is super slow and causing issues
 				if (wallet.keys.priv.spend !== null && wallet.keys.priv.spend !== '') {
-					let m_key_image = CryptoUtils.generate_key_image_helper({
+					let m_key_image = CnTransactions.generate_key_image_helper({
 						view_secret_key: wallet.keys.priv.view,
 						spend_secret_key: wallet.keys.priv.spend,
 						public_spend_key: wallet.keys.pub.spend,
@@ -293,7 +266,8 @@ export class TransactionsExplorer {
 			}
 			//console.log("signed tx: ", signed);
 			//let raw_tx_and_hash = cnUtil.serialize_rct_tx_with_hash(signed);
-			let raw_tx_and_hash = cnUtil.serialize_tx_with_hash(signed);
+			//let raw_tx_and_hash = cnUtil.serialize_tx_with_hash(signed);
+			let raw_tx_and_hash = CnTransactions.serialize_tx_with_hash(signed);
 			resolve({raw: raw_tx_and_hash, signed: signed});
 		});
 	}
@@ -492,6 +466,5 @@ export class TransactionsExplorer {
 
 		});
 	}
-
-
 }
+

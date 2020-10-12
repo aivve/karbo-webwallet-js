@@ -167,16 +167,15 @@ export class AppState{
 									reject();
 								}
 							});
-						}else {
+						} else {
 							swal.close();
 							window.location.href = '#account';
 						}
-					}else
+					} else
 						reject();
 				},1);
 			});
 		});
 	}
-
 
 }
