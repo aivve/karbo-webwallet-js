@@ -53,30 +53,8 @@ class NetworkView extends DestructableView {
 	}
 
 	refreshStats() {
-/*
-		let self = this;
-		let randInt = Math.floor(Math.random() * Math.floor(config.nodeList.length));
-		$.ajax({
-			url:config.nodeUrl+'json_rpc',
-			method: 'POST',
-			data: JSON.stringify(
-				{
-					"jsonrpc": "2.0",
-					"id": 0,
-					"method": "getlastblockheader",
-					"params": {}
-				}
-			)
-		}).done(function(data : any){
-			self.networkDifficulty = data['result']['block_header'].difficulty;
-			self.networkHashrate = parseFloat((data['result']['block_header'].difficulty/config.avgBlockTime/1000000).toFixed(2));
-			self.blockchainHeight = data['result']['block_header'].height;
-			self.lastReward = data['result']['block_header'].reward/Math.pow(10, config.coinUnitPlaces);
-			self.lastBlockFound = parseInt(data['result']['block_header'].timestamp);
-			self.connectedNode = config.nodeUrl;
-*/
 		blockchainExplorer.getNetworkInfo().then((info: NetworkInfo) => {
-			console.log(info);
+			//console.log(info);
 			this.connectedNode = info.node;
 			this.networkDifficulty = info.difficulty;
 			this.networkHashrate = info.difficulty / config.avgBlockTime;
