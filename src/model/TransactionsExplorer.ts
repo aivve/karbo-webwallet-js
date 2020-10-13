@@ -58,7 +58,6 @@ type RawOutForTx = {
 	public_key: string,
 	index: number,
 	global_index: number,
-	rct: string,
 	tx_pub_key: string
 };
 
@@ -231,7 +230,7 @@ export class TransactionsExplorer {
 			// check if generated public key matches the current output's key
 			let mine_output = (txout_k.key == generated_tx_pubkey);
 
-            if (mine_output) {
+			if (mine_output) {
 				let transactionOut = new TransactionOut();
 				if (typeof rawTransaction.global_index_start !== 'undefined')
 					transactionOut.globalIndex = rawTransaction.output_indexes[output_idx_in_tx];
@@ -258,9 +257,8 @@ export class TransactionsExplorer {
 					transactionOut.keyImage = m_key_image.key_image;
 					transactionOut.ephemeralPub = m_key_image.ephemeral_pub;
 				}
-                if (transactionOut.amount !== 0) { //fusion
-                    outs.push(transactionOut);
-                }
+
+				outs.push(transactionOut);
 
 				//if (minerTx)
 				//    break;
@@ -330,9 +328,12 @@ export class TransactionsExplorer {
 			if (typeof rawTransaction.hash !== 'undefined') transaction.hash = rawTransaction.hash;
 
 			transaction.txPubKey = tx_pub_key;
-            if (paymentId !== null && paymentId != '0000000000000000000000000000000000000000000000000000000000000000')
+
+			if (paymentId !== null)
 				transaction.paymentId = paymentId;
-			transaction.fees = rawTransaction.fee;
+			if (encryptedPaymentId !== null) {
+				transaction.paymentId = Cn.decrypt_payment_id(encryptedPaymentId, tx_pub_key, wallet.keys.priv.view);
+			}
 
 			if (rawTransaction.vin[0].type === 'ff') {
 				transaction.fees = 0;
@@ -366,7 +367,6 @@ export class TransactionsExplorer {
 		// {"height"          , tx.height},
 		// {"spend_key_images", json::array()}
 
-		console.log(wallet.getAll());
 		for (let tr of wallet.getAll()) {
 			//todo improve to take into account miner tx
 			//only add outs unlocked
@@ -389,7 +389,6 @@ export class TransactionsExplorer {
 					public_key: out.pubKey,
 					index: out.outputIdx,
 					global_index: out.globalIndex,
-					rct: rct,
 					tx_pub_key: tr.txPubKey
 				});
 			}
@@ -449,18 +448,13 @@ export class TransactionsExplorer {
 					realDestViewKey, 0, rct);
 
 				console.log("signed tx: ", signed);
-				let raw_tx_and_hash = CnTransactions.serialize_rct_tx_with_hash(signed);
+				let raw_tx_and_hash = CnTransactions.serialize_tx_with_hash(signed);
 				resolve({raw: raw_tx_and_hash, signed: signed});
 
 			} catch (e) {
 				reject("Failed to create transaction: " + e);
 			}
 
-			//console.log("signed tx: ", signed);
-			//let raw_tx_and_hash = cnUtil.serialize_rct_tx_with_hash(signed);
-			//let raw_tx_and_hash = cnUtil.serialize_tx_with_hash(signed);
-			let raw_tx_and_hash = CnTransactions.serialize_tx_with_hash(signed);
-			resolve({raw: raw_tx_and_hash, signed: signed});
 		});
 	}
 
@@ -488,7 +482,6 @@ export class TransactionsExplorer {
 			for (let dest of userDestinations) {
 				totalAmountWithoutFee = totalAmountWithoutFee.add(dest.amount);
 				let target = Cn.decode_address(dest.address);
-				//if (typeof target.intPaymentId !== 'undefined') {
 				if (target.intPaymentId !== null) {
 					++paymentIdIncluded;
 					paymentId = target.intPaymentId;
