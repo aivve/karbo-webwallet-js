@@ -53,7 +53,8 @@ export type DaemonResponseGetNodeFeeInfo = {
 }
 
 export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
-    daemonAddress = config.nodeList[Math.floor(Math.random() * Math.floor(config.nodeList.length))];
+    //daemonAddress = config.nodeList[Math.floor(Math.random() * Math.floor(config.nodeList.length))];
+    daemonAddress = config.nodeUrl;
     phpProxy: boolean = false;
 
     constructor(daemonAddress: string | null = null) {
@@ -65,7 +66,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     protected makeRpcRequest(method: string, params: any = {}): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             $.ajax({
-                url: this.daemonAddress + 'json_rpc' + (this.phpProxy ? '.php' : ''),
+                url: config.nodeUrl + 'json_rpc',
                 method: 'POST',
                 data: JSON.stringify({
                     jsonrpc: '2.0',
@@ -93,7 +94,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     protected makeRequest(method: 'GET' | 'POST', url: string, body: any = undefined): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             $.ajax({
-                url: this.daemonAddress + url + (this.phpProxy ? '.php' : ''),
+                url: config.nodeUrl + url,
                 method: method,
                 data: typeof body === 'string' ? body : JSON.stringify(body)
             }).done(function (raw: any) {
@@ -162,7 +163,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
             tempStartBlock = startBlock;
         }
 
-        return this.makeRequest('POST', 'gettransactionswithoutputglobalindexesbyheights', {
+        return this.makeRequest('POST', 'get_transactions_with_output_global_indexes_by_heights', {
             heights: [tempStartBlock, endBlock],
             include_miner_txs: includeMinerTxs,
             range: true
@@ -346,7 +347,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         return this.makeRpcRequest('getlastblockheader').then((raw: any) => {
             console.log(raw);
             return {
-                'node': this.daemonAddress.split(':')[1].replace(/[-[\]\/{}()*+?\\^$|#\s]/g, ''),
+                'node': config.nodeUrl.split(':')[1].replace(/[-[\]\/{}()*+?\\^$|#\s]/g, ''),
                 'major_version': raw.block_header['major_version'],
                 'hash': raw.block_header['hash'],
                 'reward': raw.block_header['reward'],
