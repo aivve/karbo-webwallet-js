@@ -47,7 +47,7 @@ class SendView extends DestructableView{
 	@VueVar(0) nativeVersionCode !: number;
 	@VueVar('') nativeVersionNumber !: string;
 
-	constructor(container : string){
+	constructor(container : string) {
 		super(container);
 		let self = this;
 		this.readSpeed = wallet.options.readSpeed;
@@ -104,16 +104,16 @@ class SendView extends DestructableView{
 	@VueWatched()	checkMinerTxWatch(){this.updateWalletOptions();}
 	@VueWatched()	customNodeWatch(){this.updateWalletOptions();}
 
-	@VueWatched()	creationHeightWatch(){
+	@VueWatched()	creationHeightWatch() {
 		if(this.creationHeight < 0)this.creationHeight = 0;
 		if(this.creationHeight > this.maxHeight && this.maxHeight !== -1)this.creationHeight = this.maxHeight;
 	}
-	@VueWatched()	scanHeightWatch(){
+	@VueWatched()	scanHeightWatch() {
 		if(this.scanHeight < 0)this.scanHeight = 0;
 		if(this.scanHeight > this.maxHeight && this.maxHeight !== -1)this.scanHeight = this.maxHeight;
 	}
 
-	private updateWalletOptions(){
+	private updateWalletOptions() {
 		let options = wallet.options;
 		options.readSpeed = this.readSpeed;
 		options.checkMinerTx = this.checkMinerTx;
@@ -123,16 +123,17 @@ class SendView extends DestructableView{
 		walletWatchdog.signalWalletUpdate();
 	}
 
-	updateWalletSettings(){
+	updateWalletSettings() {
 		wallet.creationHeight = this.creationHeight;
 		wallet.lastHeight = this.scanHeight;
 		walletWatchdog.signalWalletUpdate();
 	}
 
-	updateConnectionSettings(){
+	updateConnectionSettings() {
 		let options = wallet.options;
 		options.customNode = this.customNode;
 		options.nodeUrl = this.nodeUrl;
+		config.nodeUrl = this.nodeUrl;
 		wallet.options = options;
 		walletWatchdog.signalWalletUpdate();
 	}
