@@ -106,6 +106,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     }
 
     cacheInfo: any = null;
+    cacheHeight: number = 0;
     lastTimeRetrieveInfo = 0;
 
     getInfo(): Promise<DaemonResponseGetInfo> {
@@ -122,10 +123,15 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     }
 
     getHeight(): Promise<number> {
-        //return this.getInfo().then((info: DaemonResponseGetInfo) => info.height);
+        if (Date.now() - this.lastTimeRetrieveInfo < 20 * 1000 && this.cacheHeight !== 0) {
+            return Promise.resolve(this.cacheHeight);
+        }
+
         this.lastTimeRetrieveInfo = Date.now();
         return this.makeRequest('GET', 'getheight').then((data: any) => {
-            return parseInt(data.height);
+            let height = parseInt(data.height);
+            this.cacheHeight = height;
+            return height;
         })
     }
 
@@ -155,7 +161,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         return numbers;
     }
 
-    getTransactionsForBlocks(startBlock: number, endBlock: number, includeMinerTxs = true): Promise<any> {
+    getTransactionsForBlocks(startBlock: number, endBlock: number, includeMinerTxs: boolean): Promise<any> {
         let tempStartBlock;
         if (startBlock === 0) {
             tempStartBlock = 1;
@@ -260,7 +266,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
             //load compressed blocks (100 blocks) containing the blocks referred by their index
             for (let compressedBlock in compressedBlocksToGet) {
                 promiseGetCompressedBlocks = promiseGetCompressedBlocks.then(() => {
-                    return self.getTransactionsForBlocks(parseInt(compressedBlock), Math.min(parseInt(compressedBlock) + 99, height - config.txCoinbaseMinConfirms)).then(function (rawTransactions: RawDaemon_Transaction[]) {
+                    return self.getTransactionsForBlocks(parseInt(compressedBlock), Math.min(parseInt(compressedBlock) + 99, height - config.txCoinbaseMinConfirms), false).then(function (rawTransactions: RawDaemon_Transaction[]) {
                         txs.push.apply(txs, rawTransactions);
                     });
                 });

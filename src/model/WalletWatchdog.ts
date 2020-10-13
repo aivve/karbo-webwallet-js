@@ -1,6 +1,7 @@
 /**
  *     Copyright (c) 2018-2020, ExploShot
  *     Copyright (c) 2018-2020, The Qwertycoin Project
+ *     Copyright (c) 2018-2020, The Karbo
  *
  *     All rights reserved.
  *     Redistribution and use in source and binary forms, with or without modification,
@@ -59,8 +60,10 @@ export class WalletWatchdog {
         this.workerProcessing = new Worker('./workers/TransferProcessingEntrypoint.js');
         this.workerProcessing.onmessage = function (data: MessageEvent) {
             let message: string | any = data.data;
+            //console.log("InitWorker message: ");
+            //console.log(message);
             if (message === 'ready') {
-                console.info('worker ready');
+                //console.info('worker ready');
                 self.signalWalletUpdate();
             } else if (message === 'readyWallet') {
                 self.workerProcessingReady = true;
@@ -86,8 +89,16 @@ export class WalletWatchdog {
 
     signalWalletUpdate() {
         let self = this;
-        console.log('wallet update');
+        //console.log('wallet update');
         this.lastBlockLoading = -1;//reset scanning
+
+        if (this.wallet.options.customNode) {
+            config.nodeUrl = this.wallet.options.nodeUrl;
+        } else {
+            let randNodeInt:number = Math.floor(Math.random() * Math.floor(config.nodeList.length));
+            config.nodeUrl = config.nodeList[randNodeInt];
+        }
+
         this.workerProcessing.postMessage({
             type: 'initWallet',
             wallet: this.wallet.exportToRaw()
@@ -136,10 +147,11 @@ export class WalletWatchdog {
         this.explorer.getTransactionPool().then(function (data: any) {
             if (typeof data.transactions !== 'undefined')
                 for (let rawTx of data.transactions) {
-                    let tx = TransactionsExplorer.parse(rawTx.tx_json, self.wallet);
+                    let tx = TransactionsExplorer.parse(rawTx.transaction, self.wallet);
                     if (tx !== null) {
-                        tx.hash = rawTx.id_hash;
+                        tx.hash = rawTx.hash;
                         tx.fees = rawTx.fee;
+                        tx.timestamp = rawTx.timestamp;
                         self.wallet.txsMem.push(tx);
                     }
                 }
@@ -184,6 +196,11 @@ export class WalletWatchdog {
     }
 
     checkTransactionsInterval() {
+
+        //somehow we're repeating and regressing back to re-process Tx's
+        //loadHistory getting into a stack overflow ?
+        //need to work out timinings and ensure process does not reload when it's already running...
+
         if (this.workerProcessingWorking || !this.workerProcessingReady) {
             return;
         }
@@ -191,20 +208,21 @@ export class WalletWatchdog {
         //we destroy the worker in charge of decoding the transactions every 5k transactions to ensure the memory is not corrupted
         //cnUtil bug, see https://github.com/mymonero/mymonero-core-js/issues/8
         if (this.workerCountProcessed >= 5 * 1000) {
-            console.log('Recreate worker..');
+            //console.log('Recreate worker..');
             this.terminateWorker();
             this.initWorker();
             return;
         }
 
-        let transactionsToProcess: RawDaemon_Transaction[] = this.transactionsToProcess.splice(0, 30);
+        let transactionsToProcess: RawDaemon_Transaction[] = this.transactionsToProcess.splice(0, 25); //process 25 tx's at a time
         if (transactionsToProcess.length > 0) {
             this.workerCurrentProcessing = transactionsToProcess;
             this.workerProcessing.postMessage({
                 type: 'process',
                 transactions: transactionsToProcess
             });
-            this.workerCountProcessed += this.transactionsToProcess.length;
+            //this.workerCountProcessed += this.transactionsToProcess.length;
+            ++this.workerCountProcessed;
             this.workerProcessingWorking = true;
         } else {
             clearInterval(this.intervalTransactionsProcess);
@@ -214,6 +232,7 @@ export class WalletWatchdog {
 
     processTransactions(transactions: RawDaemon_Transaction[]) {
         let transactionsToAdd = [];
+
         for (let tr of transactions) {
             if (typeof tr.height !== 'undefined')
                 if (tr.height > this.wallet.lastHeight) {
@@ -239,6 +258,15 @@ export class WalletWatchdog {
 
         let self = this;
 
+        if (this.lastBlockLoading === -1) this.lastBlockLoading = this.wallet.lastHeight;
+
+        //don't reload until it's finished processing the last batch of transactions
+        if (this.workerProcessingWorking || !this.workerProcessingReady) {
+            setTimeout(function () {
+                self.loadHistory();
+            }, 100);
+            return;
+        }
         if (this.transactionsToProcess.length > 500) {
             //to ensure no pile explosion
             setTimeout(function () {
@@ -251,24 +279,16 @@ export class WalletWatchdog {
         this.explorer.getHeight().then(function (height) {
             if (height > self.lastMaximumHeight) self.lastMaximumHeight = height;
 
-            if (self.lastBlockLoading === -1) self.lastBlockLoading = self.wallet.lastHeight;
+            if (self.lastBlockLoading !== height - 1) {
+                let previousStartBlock = Number(self.lastBlockLoading);
+                let endBlock = previousStartBlock + config.syncBlockCount;
 
-            if (self.lastBlockLoading !== height) {
-                let previousStartBlock = self.lastBlockLoading;
-                let endBlock = previousStartBlock + 49;
+                if (previousStartBlock > self.lastMaximumHeight) previousStartBlock = self.lastMaximumHeight;
+                if (endBlock > self.lastMaximumHeight) endBlock = self.lastMaximumHeight;
 
-                if (previousStartBlock >= self.lastMaximumHeight) previousStartBlock = self.lastMaximumHeight;
-                if (endBlock >= self.lastMaximumHeight) endBlock = self.lastMaximumHeight;
-
-                self.explorer.getTransactionsForBlocks(previousStartBlock, endBlock, true).then(function (transactions: any) {
+                self.explorer.getTransactionsForBlocks(previousStartBlock, endBlock, self.wallet.options.checkMinerTx).then(function (transactions: any) {
                     //to ensure no pile explosion
-                    if (transactions === 'OK') {
-                        self.lastBlockLoading += 1;
-                        self.wallet.lastHeight += 1;
-                        setTimeout(function () {
-                            self.loadHistory();
-                        }, 1);
-                    } else if (transactions.length > 0) {
+                    if (transactions.length > 0) {
                         let lastTx = transactions[transactions.length - 1];
                         if (typeof lastTx.height !== 'undefined') {
                             self.lastBlockLoading = lastTx.height + 1;
@@ -277,7 +297,7 @@ export class WalletWatchdog {
                         setTimeout(function () {
                             self.loadHistory();
                         }, 1);
-                    } else  {
+                    } else {
                         setTimeout(function () {
                             self.loadHistory();
                         }, 30 * 1000);
