@@ -17,7 +17,7 @@ try {
 	(<any>self).Module_native['onRuntimeInitialized'] = function () {
 		requirejs(['./TransferProcessing.js'], function (App) {});
 	};
-}catch(e){
+}catch(e) {
 	setTimeout(function(){//wait 5s due to crypto //TODO find a better fix
 		requirejs(['./TransferProcessing.js'], function (App) {});
 	}, 5*1000);
