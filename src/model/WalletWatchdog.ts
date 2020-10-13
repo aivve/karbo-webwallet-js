@@ -279,7 +279,7 @@ export class WalletWatchdog {
         this.explorer.getHeight().then(function (height) {
             if (height > self.lastMaximumHeight) self.lastMaximumHeight = height;
 
-            if (self.lastBlockLoading !== height - 1) {
+            if (self.lastBlockLoading !== height) {
                 let previousStartBlock = Number(self.lastBlockLoading);
                 let endBlock = previousStartBlock + config.syncBlockCount;
 
@@ -288,7 +288,13 @@ export class WalletWatchdog {
 
                 self.explorer.getTransactionsForBlocks(previousStartBlock, endBlock, self.wallet.options.checkMinerTx).then(function (transactions: any) {
                     //to ensure no pile explosion
-                    if (transactions.length > 0) {
+                    if (transactions === 'OK') {
+                        self.lastBlockLoading = endBlock;
+                        self.wallet.lastHeight = endBlock;
+                        setTimeout(function () {
+                            self.loadHistory();
+                        }, 1);
+                    } else if (transactions.length > 0) {
                         let lastTx = transactions[transactions.length - 1];
                         if (typeof lastTx.height !== 'undefined') {
                             self.lastBlockLoading = lastTx.height + 1;
@@ -298,6 +304,10 @@ export class WalletWatchdog {
                             self.loadHistory();
                         }, 1);
                     } else {
+
+                        self.lastBlockLoading = endBlock;
+                        self.wallet.lastHeight = endBlock;
+
                         setTimeout(function () {
                             self.loadHistory();
                         }, 30 * 1000);
