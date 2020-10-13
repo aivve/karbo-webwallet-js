@@ -16,22 +16,20 @@
 import {DestructableView} from "../lib/numbersLab/DestructableView";
 import {VueRequireFilter, VueVar, VueWatched} from "../lib/numbersLab/VueAnnotate";
 import {TransactionsExplorer} from "../model/TransactionsExplorer";
-import {WalletRepository} from "../model/WalletRepository";
-import {BlockchainExplorerRpc2, WalletWatchdog} from "../model/blockchain/BlockchainExplorerRpc2";
 import {Autowire, DependencyInjectorInstance} from "../lib/numbersLab/DependencyInjector";
-import {Constants} from "../model/Constants";
 import {Wallet} from "../model/Wallet";
-import {BlockchainExplorer} from "../model/blockchain/BlockchainExplorer";
 import {Url} from "../utils/Url";
 import {CoinUri} from "../model/CoinUri";
 import {QRReader} from "../model/QRReader";
 import {AppState} from "../model/AppState";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
 import {NdefMessage, Nfc} from "../model/Nfc";
+import {BlockchainExplorer} from "../model/blockchain/BlockchainExplorer";
 import {Cn} from "../model/Cn";
+import {WalletWatchdog} from "../model/WalletWatchdog";
 
 let wallet: Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
-let blockchainExplorer: BlockchainExplorerRpc2 = BlockchainExplorerProvider.getInstance();
+let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
 
 AppState.enableLeftMenu();
 

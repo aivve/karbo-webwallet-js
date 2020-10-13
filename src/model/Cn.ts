@@ -1410,8 +1410,7 @@ export namespace CnTransactions{
 		return {
 			raw: buf,
 			hash: hashes,
-			//prvkey: tx.prvkey
-			prvKey: tx.prvkey
+			prvkey: tx.prvkey
 		};
 	};
 
