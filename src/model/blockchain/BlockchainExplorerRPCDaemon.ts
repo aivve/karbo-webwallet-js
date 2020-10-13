@@ -66,7 +66,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     protected makeRpcRequest(method: string, params: any = {}): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             $.ajax({
-                url: config.nodeUrl + 'json_rpc',
+                url: this.daemonAddress + 'json_rpc',
                 method: 'POST',
                 data: JSON.stringify({
                     jsonrpc: '2.0',
@@ -94,7 +94,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     protected makeRequest(method: 'GET' | 'POST', url: string, body: any = undefined): Promise<any> {
         return new Promise<any>((resolve, reject) => {
             $.ajax({
-                url: config.nodeUrl + url,
+                url: this.daemonAddress + url,
                 method: method,
                 data: typeof body === 'string' ? body : JSON.stringify(body)
             }).done(function (raw: any) {
@@ -347,7 +347,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         return this.makeRpcRequest('getlastblockheader').then((raw: any) => {
             console.log(raw);
             return {
-                'node': config.nodeUrl.split(':')[1].replace(/[-[\]\/{}()*+?\\^$|#\s]/g, ''),
+                'node': this.daemonAddress.split(':')[1].replace(/[-[\]\/{}()*+?\\^$|#\s]/g, ''),
                 'major_version': raw.block_header['major_version'],
                 'hash': raw.block_header['hash'],
                 'reward': raw.block_header['reward'],
