@@ -169,14 +169,14 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
             range: true
         }).then((answer: {
             status: 'OK' | 'string',
-            txs: { transaction: any, height: number, timestamp: number, output_indexes: number[], block_hash: string, hash: string, fee: number }[]
+            transactions: { transaction: any, timestamp: number, output_indexes: number[], height: number, block_hash: string, hash: string, fee: number }[]
         }) => {
             let formatted: RawDaemon_Transaction[] = [];
 
             if (answer.status !== 'OK') throw 'invalid_transaction_answer';
 
-            if (answer.txs.length > 0) {
-                for (let rawTx of answer.txs) {
+            if (answer.transactions.length > 0) {
+                for (let rawTx of answer.transactions) {
                     let tx: RawDaemon_Transaction | null = null;
                     try {
                         tx = rawTx.transaction;
