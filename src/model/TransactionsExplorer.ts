@@ -87,7 +87,16 @@ export class TransactionsExplorer {
 				extraSize = 32;
 				startOffset = 1;
 				hasFoundPubKey = true;
+			} else if (extra[0] === TX_EXTRA_TAG_ADDITIONAL_PUBKEYS) {
+				extraSize = extra[1] * 32;
+				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
+
+				// this tag has to be the last in extra
+				// we do nothing with it
+
+				/*
+
 				let iExtra = 2;
 				let fExtras = {
 					type: extra[0],
@@ -99,9 +108,7 @@ export class TransactionsExplorer {
 				}
 
 				continue;
-			} else if (extra[0] === TX_EXTRA_TAG_ADDITIONAL_PUBKEYS) {
-				extraSize = extra[1] * 32;
-				startOffset = 2;
+				*/
 			}
 
 			if (extraSize === 0) {
