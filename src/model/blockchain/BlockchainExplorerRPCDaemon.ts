@@ -173,16 +173,16 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
             heights: [tempStartBlock, endBlock],
             include_miner_txs: includeMinerTxs,
             range: true
-        }).then((answer: {
+        }).then((response: {
             status: 'OK' | 'string',
             transactions: { transaction: any, timestamp: number, output_indexes: number[], height: number, block_hash: string, hash: string, fee: number }[]
         }) => {
             let formatted: RawDaemon_Transaction[] = [];
 
-            if (answer.status !== 'OK') throw 'invalid_transaction_answer';
+            if (response.status !== 'OK') throw 'invalid_transaction_answer';
 
-            if (answer.transactions.length > 0) {
-                for (let rawTx of answer.transactions) {
+            if (response.transactions.length > 0) {
+                for (let rawTx of response.transactions) {
                     let tx: RawDaemon_Transaction | null = null;
                     try {
                         tx = rawTx.transaction;
@@ -206,24 +206,43 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
 
                 return formatted;
             } else {
-                return answer.status;
+                return response.status;
             }
         });
     }
 
     getTransactionPool(): Promise<RawDaemon_Transaction[]> {
         return this.makeRequest('GET', 'getrawtransactionspool').then(
-            (rawTransactions: {
-                transaction: string
-            }[]) => {
+              (response: {
+                status: 'OK' | 'string',
+                transactions: { transaction: any, timestamp: number, output_indexes: number[], height: number, block_hash: string, hash: string, fee: number }[]
+              }) => {
+
                 let formatted: RawDaemon_Transaction[] = [];
-                for (let rawTransaction of rawTransactions) {
+
+                for (let rawTx of response.transactions) {
+                    let tx: RawDaemon_Transaction | null = null;
                     try {
-                        formatted.push(JSON.parse(rawTransaction.transaction));
+                        tx = rawTx.transaction;
                     } catch (e) {
-                        console.error(e);
+                        try {
+                            //compat for some invalid endpoints
+                            tx = rawTx.transaction;
+                        } catch (e) {
+                        }
+                    }
+                    if (tx !== null) {
+                        tx.ts = rawTx.timestamp;
+                        tx.height = rawTx.height;
+                        tx.hash = rawTx.hash;
+                        if (rawTx.output_indexes.length > 0) {
+                            tx.global_index_start = rawTx.output_indexes[0];
+                            tx.output_indexes = rawTx.output_indexes;
+                        }
+                        formatted.push(tx);
                     }
                 }
+
                 return formatted;
         });
     }
