@@ -139,19 +139,16 @@ export class WalletWatchdog {
 
     checkMempool(): boolean {
         let self = this;
-        if (this.lastMaximumHeight - this.lastBlockLoading > 1) {//only check memory pool if the user is up to date to ensure outs & ins will be found in the wallet
+        if (this.lastMaximumHeight - this.lastBlockLoading > 1) { //only check memory pool if the user is up to date to ensure outs & ins will be found in the wallet
             return false;
         }
 
         this.wallet.txsMem = [];
-        this.explorer.getTransactionPool().then(function (data: any) {
-            if (typeof data.transactions !== 'undefined')
-                for (let rawTx of data.transactions) {
-                    let tx = TransactionsExplorer.parse(rawTx.transaction, self.wallet);
+        this.explorer.getTransactionPool().then(function (pool: any) {
+            if (typeof pool !== 'undefined')
+                for (let rawTx of pool) {
+                    let tx = TransactionsExplorer.parse(rawTx, self.wallet);
                     if (tx !== null) {
-                        tx.hash = rawTx.hash;
-                        tx.fees = rawTx.fee;
-                        tx.timestamp = rawTx.timestamp;
                         self.wallet.txsMem.push(tx);
                     }
                 }
