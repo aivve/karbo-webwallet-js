@@ -32,6 +32,11 @@ export class WalletRepository{
 			password = ('00000000000000000000000000000000'+password).slice(-32);
 		}
 		let privKey = new (<any>MyTextEncoder)("utf-8").encode(password);
+
+		if(privKey.length > 32){
+		   privKey = privKey.slice(-32);
+		}
+
 		//console.log('open wallet with nonce', rawWallet.nonce);
 		let nonce = new (<any>MyTextEncoder)("utf-8").encode(rawWallet.nonce);
 
@@ -95,6 +100,11 @@ export class WalletRepository{
 		}
 
 		let privKey = new (<any>MyTextEncoder)("utf-8").encode(password);
+
+		if(privKey.length > 32){
+		   privKey = privKey.slice(-32);
+		}
+
 		let rawNonce = nacl.util.encodeBase64(nacl.randomBytes(16));
 		let nonce = new (<any>MyTextEncoder)("utf-8").encode(rawNonce);
 
