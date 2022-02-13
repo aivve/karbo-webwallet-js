@@ -972,7 +972,7 @@
 
   /** @const */ var DEFAULT_ENCODING = 'utf-8';
 
-  // 8.1 Interface TextDecoder
+  // 8.1 Interface MyTextDecoder
 
   /**
    * @constructor
@@ -980,14 +980,14 @@
    *     defaults to 'utf-8'.
    * @param {Object=} options
    */
-  function TextDecoder(label, options) {
+  function MyTextDecoder(label, options) {
     // Web IDL conventions
-    if (!(this instanceof TextDecoder))
+    if (!(this instanceof MyTextDecoder))
       throw TypeError('Called as a function. Did you forget \'new\'?');
     label = label !== undefined ? String(label) : DEFAULT_ENCODING;
     options = ToDictionary(options);
 
-    // A TextDecoder object has an associated encoding, decoder,
+    // A MyTextDecoder object has an associated encoding, decoder,
     // stream, ignore BOM flag (initially unset), BOM seen flag
     // (initially unset), error mode (initially replacement), and do
     // not flush flag (initially unset).
@@ -1018,7 +1018,7 @@
                   ' Did you forget to include encoding-indexes.js first?');
     }
 
-    // 3. Let dec be a new TextDecoder object.
+    // 3. Let dec be a new MyTextDecoder object.
     var dec = this;
 
     // 4. Set dec's encoding to encoding.
@@ -1047,22 +1047,22 @@
 
   if (Object.defineProperty) {
     // The encoding attribute's getter must return encoding's name.
-    Object.defineProperty(TextDecoder.prototype, 'encoding', {
-      /** @this {TextDecoder} */
+    Object.defineProperty(MyTextDecoder.prototype, 'encoding', {
+      /** @this {MyTextDecoder} */
       get: function() { return this._encoding.name.toLowerCase(); }
     });
 
     // The fatal attribute's getter must return true if error mode
     // is fatal, and false otherwise.
-    Object.defineProperty(TextDecoder.prototype, 'fatal', {
-      /** @this {TextDecoder} */
+    Object.defineProperty(MyTextDecoder.prototype, 'fatal', {
+      /** @this {MyTextDecoder} */
       get: function() { return this._error_mode === 'fatal'; }
     });
 
     // The ignoreBOM attribute's getter must return true if ignore
     // BOM flag is set, and false otherwise.
-    Object.defineProperty(TextDecoder.prototype, 'ignoreBOM', {
-      /** @this {TextDecoder} */
+    Object.defineProperty(MyTextDecoder.prototype, 'ignoreBOM', {
+      /** @this {MyTextDecoder} */
       get: function() { return this._ignoreBOM; }
     });
   }
@@ -1072,7 +1072,7 @@
    * @param {Object=} options
    * @return {string} The decoded string.
    */
-  TextDecoder.prototype.decode = function decode(input, options) {
+  MyTextDecoder.prototype.decode = function decode(input, options) {
     var bytes;
     if (typeof input === 'object' && input instanceof ArrayBuffer) {
       bytes = new Uint8Array(input);
@@ -1159,12 +1159,12 @@
       this._decoder = null;
     }
 
-    // A TextDecoder object also has an associated serialize stream
+    // A MyTextDecoder object also has an associated serialize stream
     // algorithm...
     /**
      * @param {!Array.<number>} stream
      * @return {string}
-     * @this {TextDecoder}
+     * @this {MyTextDecoder}
      */
     function serializeStream(stream) {
       // 1. Let token be the result of reading from stream.
@@ -1195,20 +1195,20 @@
     return serializeStream.call(this, output);
   };
 
-  // 8.2 Interface TextEncoder
+  // 8.2 Interface MyTextEncoder
 
   /**
    * @constructor
    * @param {string=} label The label of the encoding. NONSTANDARD.
    * @param {Object=} options NONSTANDARD.
    */
-  function TextEncoder(label, options) {
+  function MyTextEncoder(label, options) {
     // Web IDL conventions
-    if (!(this instanceof TextEncoder))
+    if (!(this instanceof MyTextEncoder))
       throw TypeError('Called as a function. Did you forget \'new\'?');
     options = ToDictionary(options);
 
-    // A TextEncoder object has an associated encoding and encoder.
+    // A MyTextEncoder object has an associated encoding and encoder.
 
     /** @private */
     this._encoding = null;
@@ -1221,7 +1221,7 @@
     /** @private @type {string} */
     this._fatal = Boolean(options['fatal']) ? 'fatal' : 'replacement';
 
-    // 1. Let enc be a new TextEncoder object.
+    // 1. Let enc be a new MyTextEncoder object.
     var enc = this;
 
     // 2. Set enc's encoding to UTF-8's encoder.
@@ -1241,7 +1241,7 @@
       enc._encoding = getEncoding('utf-8');
 
       if (label !== undefined && 'console' in global) {
-        console.warn('TextEncoder constructor called with encoding label, '
+        console.warn('MyTextEncoder constructor called with encoding label, '
                      + 'which is ignored.');
       }
     }
@@ -1256,8 +1256,8 @@
 
   if (Object.defineProperty) {
     // The encoding attribute's getter must return encoding's name.
-    Object.defineProperty(TextEncoder.prototype, 'encoding', {
-      /** @this {TextEncoder} */
+    Object.defineProperty(MyTextEncoder.prototype, 'encoding', {
+      /** @this {MyTextEncoder} */
       get: function() { return this._encoding.name.toLowerCase(); }
     });
   }
@@ -1267,7 +1267,7 @@
    * @param {Object=} options
    * @return {!Uint8Array} Encoded bytes, as a Uint8Array.
    */
-  TextEncoder.prototype.encode = function encode(opt_string, options) {
+  MyTextEncoder.prototype.encode = function encode(opt_string, options) {
     opt_string = opt_string === undefined ? '' : String(opt_string);
     options = ToDictionary(options);
 
@@ -3294,15 +3294,15 @@
     return new XUserDefinedDecoder(options);
   };
 
-  if (!global['TextEncoder'])
-    global['TextEncoder'] = TextEncoder;
-  if (!global['TextDecoder'])
-    global['TextDecoder'] = TextDecoder;
+  if (!global['MyTextEncoder'])
+    global['MyTextEncoder'] = MyTextEncoder;
+  if (!global['MyTextDecoder'])
+    global['MyTextDecoder'] = MyTextDecoder;
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-      TextEncoder: global['TextEncoder'],
-      TextDecoder: global['TextDecoder'],
+      MyTextEncoder: global['MyTextEncoder'],
+      MyTextDecoder: global['MyTextDecoder'],
       EncodingIndexes: global["encoding-indexes"]
     };
   }
