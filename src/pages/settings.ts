@@ -36,7 +36,7 @@ class SettingsView extends DestructableView{
 	@VueVar(10) readSpeed !: number;
 	@VueVar(false) checkMinerTx !: boolean;
 
-	@VueVar(false) customNode !: boolean;
+	@VueVar(false) useCustomNode !: boolean;
 	@VueVar('http://node.karbo.io:32348/') nodeUrl !: string;
 
 	@VueVar(0) creationHeight !: number;
@@ -54,7 +54,7 @@ class SettingsView extends DestructableView{
 		this.readSpeed = wallet.options.readSpeed;
 		this.checkMinerTx = wallet.options.checkMinerTx;
 
-		this.customNode = wallet.options.customNode;
+		this.useCustomNode = wallet.options.useCustomNode;
 		this.nodeUrl = wallet.options.nodeUrl;
 
 		this.creationHeight = wallet.creationHeight;
@@ -105,7 +105,7 @@ class SettingsView extends DestructableView{
 		let options = wallet.options;
 		options.readSpeed = this.readSpeed;
 		options.checkMinerTx = this.checkMinerTx;
-		options.customNode = this.customNode;
+		options.useCustomNode = this.useCustomNode;
 		options.nodeUrl = this.nodeUrl;
 		wallet.options = options;
 		walletWatchdog.signalWalletUpdate();
@@ -119,7 +119,7 @@ class SettingsView extends DestructableView{
 
 	updateConnectionSettings() {
 		let options = wallet.options;
-		options.customNode = this.customNode;
+		options.useCustomNode = this.useCustomNode;
 		options.nodeUrl = this.nodeUrl;
 		config.nodeUrl = this.nodeUrl;
 		wallet.options = options;

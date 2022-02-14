@@ -50,7 +50,7 @@ export class WalletWatchdog {
     initWorker() {
         let self = this;
 
-        if (this.wallet.options.customNode) {
+        if (this.wallet.options.useCustomNode) {
             config.nodeUrl = this.wallet.options.nodeUrl;
         } else {
             let randNodeInt:number = Math.floor(Math.random() * Math.floor(config.nodeList.length));
@@ -92,7 +92,7 @@ export class WalletWatchdog {
         //console.log('wallet update');
         this.lastBlockLoading = -1;//reset scanning
 
-        if (this.wallet.options.customNode) {
+        if (this.wallet.options.useCustomNode) {
             config.nodeUrl = this.wallet.options.nodeUrl;
         } else {
             let randNodeInt:number = Math.floor(Math.random() * Math.floor(config.nodeList.length));

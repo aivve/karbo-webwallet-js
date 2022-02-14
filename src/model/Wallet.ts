@@ -21,14 +21,14 @@ import {Cn, CnNativeBride, CnTransactions} from "./Cn";
 export type RawWalletOptions = {
 	checkMinerTx?:boolean,
 	readSpeed:number,
-	customNode?:boolean,
+	useCustomNode?:boolean,
 	nodeUrl:string
 }
 
 export class WalletOptions{
 	checkMinerTx:boolean = false;
 	readSpeed:number = 10;
-	customNode:boolean = false;
+	useCustomNode:boolean = false;
 	nodeUrl:string = 'http://node.karbo.io:32348/';
 
 	static fromRaw(raw : RawWalletOptions){
@@ -36,7 +36,8 @@ export class WalletOptions{
 
 		if(typeof raw.checkMinerTx !== 'undefined')options.checkMinerTx = raw.checkMinerTx;
 		if(typeof raw.readSpeed !== 'undefined')options.readSpeed = raw.readSpeed;
-		if(typeof raw.customNode !== 'undefined')options.customNode = raw.customNode;
+		if(typeof raw.useCustomNode !== 'undefined')options.useCustomNode = raw.useCustomNode;
+		else options.useCustomNode = false;
 		if(typeof raw.nodeUrl !== 'undefined')options.nodeUrl = raw.nodeUrl;
 
 		return options;
@@ -46,7 +47,7 @@ export class WalletOptions{
 		let data : RawWalletOptions = {
 			readSpeed:this.readSpeed,
 			checkMinerTx:this.checkMinerTx,
-			customNode:this.customNode,
+			useCustomNode:this.useCustomNode,
 			nodeUrl:this.nodeUrl
 		};
 		return data;
@@ -143,6 +144,7 @@ export class Wallet extends Observable{
 		if(typeof raw.creationHeight !== 'undefined') wallet.creationHeight = raw.creationHeight;
 
 		if(typeof raw.options !== 'undefined') wallet._options = WalletOptions.fromRaw(raw.options);
+
 		if(typeof raw.txPrivateKeys !== 'undefined') wallet.txPrivateKeys = raw.txPrivateKeys;
 
 		if(typeof raw.coinAddressPrefix !== 'undefined') wallet.coinAddressPrefix = raw.coinAddressPrefix;
