@@ -15,6 +15,7 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Password = void 0;
     var Password = /** @class */ (function () {
         function Password() {
         }

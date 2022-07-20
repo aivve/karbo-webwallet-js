@@ -1,6 +1,6 @@
 {
   "website":{
-	"title":"Client-side Karbo Web Wallet",
+	"title":"Karbo Wallet",
 	"description":"Official online wallet for Karbo currency - fully handled in your browser for optimal security"
   },
   "messages": {
@@ -31,7 +31,8 @@
 	  "openWalletModal":{
 		"title":"Wallet Password",
 		"confirmText":"Open",
-		"cancelText":"Cancel"
+		"cancelText":"Cancel",
+		"forgotPassword": "Forgot password?"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Oops...",
@@ -63,7 +64,7 @@
 	  "github": "GitHub"
 	},
 	"homepage": {
-	  "mainTitle": "Secure Karbo Wallet",
+	  "mainTitle": "Welcome to Karbo Wallet",
 	  "tagLine": "The simplest way to use Karbo – anywhere and any time",
 	  "actions": {
 		"loadWallet": "Load my wallet",
@@ -74,19 +75,19 @@
 	  "notes": {
 		"secure": {
 		  "title": "Secure",
-		  "description": "No servers, fully encrypted!"
+		  "description": "Fully encrypted!"
 		},
 		"fast": {
-		  "title": "Fast",
-		  "description": "Send Everywhere, Anytime!"
+		  "title": "Accessible",
+		  "description": "Browser based!"
 		},
 		"technology": {
-		  "title": "Local",
-		  "description": "Keys on your device"
+		  "title": "Client-side",
+		  "description": "Keys on your device!"
 		},
 		"openSource": {
 		  "title": "Open-source",
-		  "description": "Verify on Github!"
+		  "description": "Hosted on Github!"
 		}
 	  }
 	},
@@ -98,7 +99,9 @@
 	  },
 	  "balanceBlock": {
 		"title": "Your balance",
-		"unlocked": "Unlocked"
+		"total": "Total",
+		"unlocked": "Unlocked",
+		"pending": "Pending"
 	  },
 	  "historyBlock": {
 		"title": "Transaction history",
@@ -187,14 +190,22 @@
 	  "subtitle":"We are here to help!",
 	  "getInTouchBlock":{
 		"title":"Let's Get In Touch!",
-		"content":"Do you have ideas or feedback that could help us improve the wallet? Contact us!",
+		"content":"If you have any problems with your wallet, contact us!",
 		"discord":"Karbo Discord Channel"
+	  }
+	},
+	"forgotPasswordPage":{
+	  "subtitle":"How to restore access to your wallet",
+	  "forgotPasswordBlock":{
+		"title":"If you forgot the password, it is impossible to reset it!",
+		"content":"The only way to get back into your wallet is to recall your password or to delete wallet data from your browser's memory and restore it from the backup (e.g. mnemonic recovery phrase).<br /> If you have wallet keys or a recovery phrase, below you can delete your wallet. Then you will be able to restore it and sync from scratch.<br/> <strong>Please, make sure you have recovery phrase before you proceed!!!</strong>"
 	  }
 	},
 	"networkPage":{
 	  "title":"Network stats",
 	  "subtitle":"Insights on the Karbo network",
 	  "statsBlock":{
+		"connectNode": "Connected to node",
 		"hashrate":"Network hashrate",
 		"height":"Blockchain height",
 		"difficulty":"Network difficulty",
@@ -220,6 +231,10 @@
 		"paymentId":{
 		  "label":"Payment ID (optional)",
 		  "invalid":"The payment ID is invalid. The length must be 16 or 64 characters"
+		},
+		"mixin":{
+		  "label":"Privacy",
+		  "invalid":"The mixin is invalid, should be from 3 to 10 or zero"
 		},
 		"sendButton":"Send",
 		"cancelButton":"Cancel"
@@ -336,6 +351,12 @@
 		},
 		"readMinerTx":{
 		  "label":"Read miner transactions (only for solo mining)"
+		},
+		"customNode":{
+		  "label":"Use custom node"
+		},
+	    "nodeUrl":{
+		  "label":"Node URL"
 		}
 	  },
 	  "changePasswordButton":"Change my wallet password",
@@ -432,7 +453,7 @@
 	},
 	"privacyPolicyPage":{
 	  "title":"Privacy Policy",
-	  "subtitle":"Please read them carefully."
+	  "subtitle":"Please read carefully."
 	},
 	"importFromFilePage":{
 	  "title":"Importing wallet from a backup file",

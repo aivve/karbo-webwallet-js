@@ -1,6 +1,12 @@
+//export {};
 let global : any = typeof window !== 'undefined' ? window : self;
 global.config = {
-	apiUrl:typeof window !== 'undefined' && window.location ? window.location.href.substr(0,window.location.href.lastIndexOf('/')+1)+'api/' : 'https://wallet.karbo.org/api/',
+    nodeList: [
+        "https://karbo.club/services/node_web/",
+		"https://node.karbo.org:32448/",
+		"https://node2.karbo.org:32448/"
+    ],
+	nodeUrl: "",
 	mainnetExplorerUrl: "http://explorer.karbowanec.com/",
 	mainnetExplorerUrlHash: "http://explorer.karbowanec.com/?hash={ID}#blockchain_transaction",
 	mainnetExplorerUrlBlock: "http://explorer.karbowanec.com/?hash={ID}#blockchain_block",
@@ -10,7 +16,7 @@ global.config = {
 	testnet: false,
     coinUnitPlaces: 12,
     coinDisplayUnitPlaces: 2,
-	txMinConfirms: 10,         
+	txMinConfirms: 5,
 	txCoinbaseMinConfirms: 10,
 	addressPrefix: 111,
 	integratedAddressPrefix: 112,
@@ -18,14 +24,10 @@ global.config = {
 	integratedAddressPrefixTestnet: 112,
 	subAddressPrefix: 113,
 	subAddressPrefixTestnet: 113,
-	coinFee: new JSBigInt('100000000000'),
-	feePerKB: new JSBigInt('100000000000'), //for testnet its not used, as fee is dynamic.
+	coinFee: new JSBigInt('10000000000'),
 	dustThreshold: new JSBigInt('100000000'),//used for choosing outputs/change - we decompose all the way down if the receiver wants now regardless of threshold
-	defaultMixin: 0, // default value mixin
-
-	idleTimeout: 30,
-	idleWarningDuration: 20,
-
+	defaultMixin: 3, // default value mixin
+	syncBlockCount: 1000,
 	coinSymbol: 'KRB',
 	openAliasPrefix: "krb",
 	coinName: 'Karbo',
@@ -33,3 +35,5 @@ global.config = {
 	avgBlockTime: 240,
 	maxBlockNumber: 500000000,
 };
+let randInt = Math.floor(Math.random() * Math.floor(config.nodeList.length));
+config.nodeUrl = config.nodeList[randInt];

@@ -15,6 +15,7 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.MathUtil = void 0;
     var MathUtil = /** @class */ (function () {
         function MathUtil() {
         }

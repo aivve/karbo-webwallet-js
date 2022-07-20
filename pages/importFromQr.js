@@ -13,9 +13,12 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -28,7 +31,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numbersLab/VueAnnotate", "../model/AppState", "../model/Password", "../model/Wallet", "../model/KeysRepository", "../providers/BlockchainExplorerProvider", "../model/QRReader", "../model/CoinUri", "../model/Mnemonic"], function (require, exports, DestructableView_1, VueAnnotate_1, AppState_1, Password_1, Wallet_1, KeysRepository_1, BlockchainExplorerProvider_1, QRReader_1, CoinUri_1, Mnemonic_1) {
+define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numbersLab/VueAnnotate", "../model/AppState", "../model/Password", "../model/Wallet", "../model/KeysRepository", "../providers/BlockchainExplorerProvider", "../model/QRReader", "../model/CoinUri", "../model/Mnemonic", "../model/Cn"], function (require, exports, DestructableView_1, VueAnnotate_1, AppState_1, Password_1, Wallet_1, KeysRepository_1, BlockchainExplorerProvider_1, QRReader_1, CoinUri_1, Mnemonic_1, Cn_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     AppState_1.AppState.enableLeftMenu();
@@ -62,7 +65,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                     if (detectedMnemonicLang !== null) {
                         var mnemonic_decoded = Mnemonic_1.Mnemonic.mn_decode(self.mnemonicSeed, detectedMnemonicLang);
                         if (mnemonic_decoded !== null) {
-                            var keys = cnUtil.create_address(mnemonic_decoded);
+                            var keys = Cn_1.Cn.create_address(mnemonic_decoded);
                             newWallet.keys = KeysRepository_1.KeysRepository.fromPriv(keys.spend.sec, keys.view.sec);
                         }
                         else {
@@ -88,12 +91,12 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                 else if (self.privateSpendKey !== null) {
                     var viewkey = self.privateViewKey !== null ? self.privateViewKey : '';
                     if (viewkey === '') {
-                        viewkey = cnUtil.generate_keys(cnUtil.cn_fast_hash(self.privateSpendKey)).sec;
+                        viewkey = Cn_1.Cn.generate_keys(Cn_1.CnUtils.cn_fast_hash(self.privateSpendKey)).sec;
                     }
                     newWallet.keys = KeysRepository_1.KeysRepository.fromPriv(self.privateSpendKey, viewkey);
                 }
                 else if (self.privateSpendKey === null && self.privateViewKey !== null && self.publicAddress !== null) {
-                    var decodedPublic = cnUtil.decode_address(self.publicAddress);
+                    var decodedPublic = Cn_1.Cn.decode_address(self.publicAddress);
                     newWallet.keys = {
                         priv: {
                             spend: '',
@@ -183,7 +186,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
         ImportView.prototype.stopScan = function () {
             if (typeof window.QRScanner !== 'undefined') {
                 window.QRScanner.cancelScan(function (status) {
-                    console.log(status);
+                    //console.log(status);
                 });
                 window.QRScanner.hide();
                 $('body').removeClass('transparent');

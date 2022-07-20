@@ -13,22 +13,28 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbersLab/Observable", "./CryptoUtils"], function (require, exports, Transaction_1, KeysRepository_1, Observable_1, CryptoUtils_1) {
+define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbersLab/Observable", "./Cn"], function (require, exports, Transaction_1, KeysRepository_1, Observable_1, Cn_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Wallet = exports.WalletOptions = void 0;
     var WalletOptions = /** @class */ (function () {
         function WalletOptions() {
             this.checkMinerTx = false;
             this.readSpeed = 10;
+            this.customNode = false;
+            this.nodeUrl = 'https://node.karbo.org:32448/';
         }
         WalletOptions.fromRaw = function (raw) {
             var options = new WalletOptions();
@@ -36,12 +42,18 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                 options.checkMinerTx = raw.checkMinerTx;
             if (typeof raw.readSpeed !== 'undefined')
                 options.readSpeed = raw.readSpeed;
+            if (typeof raw.customNode !== 'undefined')
+                options.customNode = raw.customNode;
+            if (typeof raw.nodeUrl !== 'undefined')
+                options.nodeUrl = raw.nodeUrl;
             return options;
         };
         WalletOptions.prototype.exportToJson = function () {
             var data = {
                 readSpeed: this.readSpeed,
-                checkMinerTx: this.checkMinerTx
+                checkMinerTx: this.checkMinerTx,
+                customNode: this.customNode,
+                nodeUrl: this.nodeUrl
             };
             return data;
         };
@@ -149,7 +161,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                 if (modified)
                     this.notify();
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Object.defineProperty(Wallet.prototype, "options", {
@@ -160,7 +172,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                 this._options = value;
                 this.modified = true;
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Wallet.prototype.getAll = function (forceReload) {
@@ -180,13 +192,24 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
             if (replace === void 0) { replace = true; }
             var exist = this.findWithTxPubKey(transaction.txPubKey);
             if (!exist || replace) {
-                if (!exist)
+                if (!exist) {
                     this.transactions.push(transaction);
-                else
-                    for (var tr = 0; tr < this.transactions.length; ++tr)
+                }
+                else {
+                    for (var tr = 0; tr < this.transactions.length; ++tr) {
                         if (this.transactions[tr].txPubKey === transaction.txPubKey) {
                             this.transactions[tr] = transaction;
                         }
+                    }
+                }
+                // remove from unconfirmed
+                var existMem = this.findMemWithTxPubKey(transaction.txPubKey);
+                if (existMem) {
+                    var trIndex = this.txsMem.indexOf(existMem);
+                    if (trIndex != -1) {
+                        this.txsMem.splice(trIndex, 1);
+                    }
+                }
                 // this.saveAll();
                 this.recalculateKeyImages();
                 this.modified = true;
@@ -195,6 +218,14 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
         };
         Wallet.prototype.findWithTxPubKey = function (pubKey) {
             for (var _i = 0, _a = this.transactions; _i < _a.length; _i++) {
+                var tr = _a[_i];
+                if (tr.txPubKey === pubKey)
+                    return tr;
+            }
+            return null;
+        };
+        Wallet.prototype.findMemWithTxPubKey = function (pubKey) {
+            for (var _i = 0, _a = this.txsMem; _i < _a.length; _i++) {
                 var tr = _a[_i];
                 if (tr.txPubKey === pubKey)
                     return tr;
@@ -248,15 +279,14 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                 var transaction = _a[_i];
                 news.push(Transaction_1.Transaction.fromRaw(transaction.export()));
             }
+            news.sort(function (a, b) {
+                return a.timestamp - b.timestamp;
+            });
             return news;
         };
-        Object.defineProperty(Wallet.prototype, "amount", {
-            get: function () {
-                return this.unlockedAmount(-1);
-            },
-            enumerable: true,
-            configurable: true
-        });
+        Wallet.prototype.amount = function () {
+            return this.unlockedAmount(-1);
+        };
         Wallet.prototype.unlockedAmount = function (currentBlockHeight) {
             if (currentBlockHeight === void 0) { currentBlockHeight = -1; }
             var amount = 0;
@@ -264,36 +294,15 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                 var transaction = _a[_i];
                 if (!transaction.isFullyChecked())
                     continue;
-                // if(transaction.ins.length > 0){
-                // 	amount -= transaction.fees;
-                // }
-                if (transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-                    for (var _b = 0, _c = transaction.outs; _b < _c.length; _b++) {
-                        var out = _c[_b];
-                        amount += out.amount;
-                    }
-                for (var _d = 0, _e = transaction.ins; _d < _e.length; _d++) {
-                    var nin = _e[_d];
-                    amount -= nin.amount;
-                }
+                if (currentBlockHeight === -1 || transaction.isConfirmed(currentBlockHeight))
+                    amount += transaction.getAmount();
             }
-            // console.log(this.txsMem);
-            for (var _f = 0, _g = this.txsMem; _f < _g.length; _f++) {
-                var transaction = _g[_f];
-                // console.log(transaction.paymentId);
-                // for(let out of transaction.outs){
-                // 	amount += out.amount;
-                // }
-                if (transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-                    for (var _h = 0, _j = transaction.outs; _h < _j.length; _h++) {
-                        var nout = _j[_h];
-                        amount += nout.amount;
-                        // console.log('+'+nout.amount);
-                    }
-                for (var _k = 0, _l = transaction.ins; _k < _l.length; _k++) {
-                    var nin = _l[_k];
-                    amount -= nin.amount;
-                    // console.log('-'+nin.amount);
+            if (currentBlockHeight === -1) {
+                for (var _b = 0, _c = this.txsMem; _b < _c.length; _b++) {
+                    var transaction = _c[_b];
+                    //if(!transaction.isFullyChecked())
+                    //	continue;
+                    amount += transaction.getAmount();
                 }
             }
             return amount;
@@ -302,7 +311,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
             return this.modified;
         };
         Wallet.prototype.getPublicAddress = function () {
-            return cnUtil.pubkeys_to_string(this.keys.pub.spend, this.keys.pub.view);
+            return Cn_1.Cn.pubkeys_to_string(this.keys.pub.spend, this.keys.pub.view);
         };
         Wallet.prototype.recalculateIfNotViewOnly = function () {
             if (!this.isViewOnly()) {
@@ -319,7 +328,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                     if (needDerivation) {
                         var derivation = '';
                         try {
-                            derivation = cnUtil.generate_key_derivation(tx.txPubKey, this.keys.priv.view); //9.7ms
+                            derivation = Cn_1.CnNativeBride.generate_key_derivation(tx.txPubKey, this.keys.priv.view);
                         }
                         catch (e) {
                             continue;
@@ -327,7 +336,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                         for (var _d = 0, _e = tx.outs; _d < _e.length; _d++) {
                             var out = _e[_d];
                             if (out.keyImage === '') {
-                                var m_key_image = CryptoUtils_1.CryptoUtils.generate_key_image_helper({
+                                var m_key_image = Cn_1.CnTransactions.generate_key_image_helper({
                                     view_secret_key: this.keys.priv.view,
                                     spend_secret_key: this.keys.priv.spend,
                                     public_spend_key: this.keys.pub.spend,
@@ -346,7 +355,7 @@ define(["require", "exports", "./Transaction", "./KeysRepository", "../lib/numbe
                         var vin = this.transactions[iTx].ins[iIn];
                         if (vin.amount < 0) {
                             if (this.keyImages.indexOf(vin.keyImage) != -1) {
-                                // console.log('found in', vin);
+                                //console.log('found in', vin);
                                 var walletOuts = this.getAllOuts();
                                 for (var _f = 0, walletOuts_1 = walletOuts; _f < walletOuts_1.length; _f++) {
                                     var ut = walletOuts_1[_f];

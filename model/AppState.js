@@ -12,9 +12,10 @@
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockchain/BlockchainExplorerRpc2", "./Wallet", "../providers/BlockchainExplorerProvider", "../lib/numbersLab/Observable", "./WalletRepository", "./TransactionsExplorer"], function (require, exports, DependencyInjector_1, BlockchainExplorerRpc2_1, Wallet_1, BlockchainExplorerProvider_1, Observable_1, WalletRepository_1, TransactionsExplorer_1) {
+define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./Wallet", "../providers/BlockchainExplorerProvider", "../lib/numbersLab/Observable", "./WalletRepository", "./TransactionsExplorer", "./WalletWatchdog"], function (require, exports, DependencyInjector_1, Wallet_1, BlockchainExplorerProvider_1, Observable_1, WalletRepository_1, TransactionsExplorer_1, WalletWatchdog_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.AppState = exports.WalletWorker = void 0;
     var WalletWorker = /** @class */ (function () {
         function WalletWorker(wallet, password) {
             this.intervalSave = 0;
@@ -43,7 +44,7 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
             var walletWorker = new WalletWorker(wallet, password);
             DependencyInjector_1.DependencyInjectorInstance().register(Wallet_1.Wallet.name, wallet);
             var watchdog = BlockchainExplorerProvider_1.BlockchainExplorerProvider.getInstance().watchdog(wallet);
-            DependencyInjector_1.DependencyInjectorInstance().register(BlockchainExplorerRpc2_1.WalletWatchdog.name, watchdog);
+            DependencyInjector_1.DependencyInjectorInstance().register(WalletWatchdog_1.WalletWatchdog.name, watchdog);
             DependencyInjector_1.DependencyInjectorInstance().register(WalletWorker.name, walletWorker);
             $('body').addClass('connected');
             if (wallet.isViewOnly())
@@ -52,12 +53,12 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
         AppState.disconnect = function () {
             var wallet = DependencyInjector_1.DependencyInjectorInstance().getInstance(Wallet_1.Wallet.name, 'default', false);
             var walletWorker = DependencyInjector_1.DependencyInjectorInstance().getInstance(WalletWorker.name, 'default', false);
-            var walletWatchdog = DependencyInjector_1.DependencyInjectorInstance().getInstance(BlockchainExplorerRpc2_1.WalletWatchdog.name, 'default', false);
+            var walletWatchdog = DependencyInjector_1.DependencyInjectorInstance().getInstance(WalletWatchdog_1.WalletWatchdog.name, 'default', false);
             if (walletWatchdog !== null)
                 walletWatchdog.stop();
             DependencyInjector_1.DependencyInjectorInstance().register(Wallet_1.Wallet.name, undefined, 'default');
             DependencyInjector_1.DependencyInjectorInstance().register(WalletWorker.name, undefined, 'default');
-            DependencyInjector_1.DependencyInjectorInstance().register(BlockchainExplorerRpc2_1.WalletWatchdog.name, undefined, 'default');
+            DependencyInjector_1.DependencyInjectorInstance().register(WalletWatchdog_1.WalletWatchdog.name, undefined, 'default');
             $('body').removeClass('connected');
             $('body').removeClass('viewOnlyWallet');
         };
@@ -83,6 +84,7 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
                     showCancelButton: true,
                     confirmButtonText: i18n.t('global.openWalletModal.confirmText'),
                     cancelButtonText: i18n.t('global.openWalletModal.cancelText'),
+                    html: "<a href=\"#!forgotPassword\"><small>" + i18n.t('global.openWalletModal.forgotPassword') + "</small></a>"
                 }).then(function (result) {
                     setTimeout(function () {
                         if (result.value) {
@@ -98,7 +100,7 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
                             var memoryWallet = DependencyInjector_1.DependencyInjectorInstance().getInstance(Wallet_1.Wallet.name, 'default', false);
                             if (memoryWallet === null) {
                                 WalletRepository_1.WalletRepository.getLocalWalletWithPassword(savePassword_1).then(function (wallet) {
-                                    console.log(wallet);
+                                    //console.log(wallet);
                                     if (wallet !== null) {
                                         wallet.recalculateIfNotViewOnly();
                                         //checking the wallet to find integrity/problems and try to update it before loading
@@ -115,7 +117,8 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
                                             var promisesBlocks = [];
                                             for (var _b = 0, blockchainHeightToRescan_1 = blockchainHeightToRescan; _b < blockchainHeightToRescan_1.length; _b++) {
                                                 var height = blockchainHeightToRescan_1[_b];
-                                                promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height)));
+                                                promisesBlocks.push(blockchainExplorer.getTransactionsForBlocks(parseInt(height), parseInt(height), wallet.options.checkMinerTx));
+                                                //console.log(`promisesBlocks.length: ${promisesBlocks.length}`);
                                             }
                                             Promise.all(promisesBlocks).then(function (arrayOfTxs) {
                                                 for (var _i = 0, arrayOfTxs_1 = arrayOfTxs; _i < arrayOfTxs_1.length; _i++) {
@@ -124,8 +127,10 @@ define(["require", "exports", "../lib/numbersLab/DependencyInjector", "./blockch
                                                         var rawTx = txs_1[_a];
                                                         if (wallet !== null) {
                                                             var tx = TransactionsExplorer_1.TransactionsExplorer.parse(rawTx, wallet);
-                                                            if (tx !== null)
+                                                            if (tx !== null) {
+                                                                console.log("Added new Tx " + tx.hash + " to wallet");
                                                                 wallet.addNew(tx);
+                                                            }
                                                         }
                                                     }
                                                 }

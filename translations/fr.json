@@ -1,6 +1,6 @@
 {
   "website":{
-	"title":"Portefeuille officiel en ligne pour Karbo ",
+	"title":"Portefeuille pour Karbo",
 	"description":"Portefeuille en ligne officiel pour la monnaie Karbo, anonyme, sécurisé et entièrement géré dans votre navigateur for une sécurité optimale"
   },
   "messages": {
@@ -31,7 +31,8 @@
 	  "openWalletModal":{
 		"title":"Mot de passe",
 		"confirmText":"Ouvrir",
-		"cancelText":"Annuler"
+		"cancelText":"Annuler",
+		"forgotPassword": "Mot de passe oublié?"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Oups...",
@@ -63,7 +64,7 @@
 	  "github": "GitHub"
 	},
 	"homepage": {
-	  "mainTitle": "Portefeuille sécurisé pour Karbo",
+	  "mainTitle": "Bienvenue dans Portefeuille pour Karbo",
 	  "tagLine": "Le moyen le plus simple d'utiliser Karbo, n'importe où, n'importe quand",
 	  "actions": {
 		"loadWallet": "Charger mon portefeuille",
@@ -74,19 +75,19 @@
 	  "notes": {
 		"secure": {
 		  "title": "Sécurisé",
-		  "description": "Aucun serveur, entièrement chiffré !"
+		  "description": "Entièrement chiffré!"
 		},
 		"fast": {
-		  "title": "Rapide",
-		  "description": "Envoyer n'importe, n'importe ou"
+		  "title": "Accessible",
+		  "description": "Basé sur un navigateur!"
 		},
 		"technology": {
-		  "title": "Technologie unique",
-		  "description": "Connectée directement à la Blockchain Karbo !"
+		  "title": "Côté client",
+		  "description": "Les clés de votre appareil!"
 		},
 		"openSource": {
-		  "title": "Entièrement open-source",
-		  "description": "Disponible sur github"
+		  "title": "Open source",
+		  "description": "Hébergé sur Github!"
 		}
 	  }
 	},
@@ -98,7 +99,9 @@
 	  },
 	  "balanceBlock": {
 		"title": "Votre solde",
-		"unlocked": "Disponible"
+		"total": "Total",
+		"unlocked": "Disponible",
+		"pending": "En attente"
 	  },
 	  "historyBlock": {
 		"title": "Historique des transactions",
@@ -187,8 +190,15 @@
 	  "subtitle":"Vous avez besoins d'aide, nous somme la pour aider !",
 	  "getInTouchBlock":{
 		"title":"Reston en contact !",
-		"content":"Vous avez des idées, des retours pour aider à améliorer le service ? Contactez nous !",
+		"content":"Si vous rencontrez des problèmes avec votre portefeuille, contactez-nous !",
 		"discord":"Discord Officiel de Karbo"
+	  }
+	},
+	"forgotPasswordPage":{
+	  "subtitle":"Comment restaurer l'accès à votre portefeuille",
+	  "forgotPasswordBlock":{
+		"title":"Si vous avez oublié le mot de passe, il est impossible de le réinitialiser !",
+		"content":"La seule façon de restaurer l'accès à votre portefeuille est de rappeler votre mot de passe ou de supprimer les données du portefeuille de la mémoire de votre navigateur et de restaurer le portefeuille à partir de la sauvegarde (par exemple, une phrase de récupération mnémonique).<br /> Si vous avez des clés de portefeuille ou une phrase de récupération , ci-dessous vous pouvez supprimer votre portefeuille. Ensuite, vous pourrez le restaurer et le synchroniser à partir de zéro.<br/> <strong>Veuillez vous assurer d'avoir une phrase de récupération avant de continuer !!!</strong>"
 	  }
 	},
 	"networkPage":{
@@ -220,6 +230,10 @@
 		"paymentId":{
 		  "label":"Identifiant du payment (optionnel)",
 		  "invalid":"L'identifiant du paiement est invalid. La longeur doit être de 16 ou 64 caractères"
+		},
+		"mixin":{
+		  "label":"Confidentialité",
+		  "invalid":"Le mixin est invalide, doit être compris entre 3 et 10 ou zéro"
 		},
 		"sendButton":"Envoyer",
 		"cancelButton":"Annuler"
@@ -336,7 +350,13 @@
 		},
 		"readMinerTx":{
 		  "label":"Lire les transactions de minage (uniquement pour les personnes faisant du solo-minage)"
-		}
+		},
+		  "customNode":{
+			  "label":"Use custom node"
+		  },
+		  "nodeUrl":{
+			  "label":"Node URL"
+		  }
 	  },
 	  "changePasswordButton":"Changer le mot de passe de mon portefeuille",
 	  "deleteWalletButton":"Supprimer mon portefeuille (copie locale)",

@@ -21,11 +21,19 @@
 		<div class="panel">
 			<div class="body" >
 				<div class="header-title" >{{ $t("accountPage.balanceBlock.title") }}</div>
-				<div class="content" >
-					<span class="walletAmount" >{{ $n(walletAmount / currencyDivider) }}</span> KRB
-					<tempate class="amount unlocked" v-if="unlockedWalletAmount !== walletAmount" >
-						<br/>{{ $t("accountPage.balanceBlock.unlocked") }}: <span class="walletAmount" >{{ $n(unlockedWalletAmount / currencyDivider) }}</span> KRB
-					</tempate>
+				<div class="content balance_content" >
+					<div class="wallet_amount amount_total">
+						<div class="walletAmountLabel amount_cell">{{ $t("accountPage.balanceBlock.total") }}:</div>
+						<div class="amount_cell" ><span class="walletAmount">{{ $n(walletAmount / currencyDivider) }}</span> {{ticker}}</div>
+					</div>
+					<div class="wallet_amount amount_pending" v-if="unlockedWalletAmount !== walletAmount">
+						<div class="walletAmountLabel amount_cell">{{ $t("accountPage.balanceBlock.pending") }}:</div>
+						<div class="amount_cell"><span class="walletAmount">{{ $n((walletAmount - unlockedWalletAmount) / currencyDivider) }}</span> {{ticker}}</div>
+					  </div>
+					<div class="wallet_amount amount_unlocked" v-if="unlockedWalletAmount !== walletAmount">
+						<div class="walletAmountLabel amount_cell">{{ $t("accountPage.balanceBlock.unlocked") }}:</div>
+						<div class="amount_cell"><span class="walletAmount">{{ $n(unlockedWalletAmount / currencyDivider) }}</span> {{ticker}}</div>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -1,6 +1,6 @@
 {
   "website":{
-	"title":"Portafoglio online ufficiale per Karbo",
+	"title":"Portafoglio per Karbo",
 	"description":"Portafoglio online ufficiale per Karbo currency - anonimo, sicuro e completamente gestito nel tuo browser per una sicurezza ottimale"
   },
   "messages": {
@@ -30,7 +30,8 @@
 	  "openWalletModal":{
 		"title":"Password portafoglio",
 		"confirmText":"Apri",
-		"cancelText":"Annulla"
+		"cancelText":"Annulla",
+		"forgotPassword": "Ha dimenticato la password?"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Oops...",
@@ -62,7 +63,7 @@
 	  "github": "GitHub"
 	},
 	"homepage": {
-	  "mainTitle": "Portafoglio sicuro per Karbo",
+	  "mainTitle": "Benvenuto in Portafoglio per Karbo",
 	  "tagLine": "Il modo più semplice per usare Karbo - ovunque e in qualsiasi momento",
 	  "actions": {
 		"loadWallet": "Carica il mio portafoglio",
@@ -73,19 +74,19 @@
 	  "notes": {
 		"secure": {
 		  "title": "Sicuro",
-		  "description": "Nessun server, completamente crittografato!"
+		  "description": "Completamente crittografato!"
 		},
 		"fast": {
-		  "title": "Veloce",
-		  "description": "Invia ovunque e in qualsiasi momento!"
+		  "title": "Accessibile",
+		  "description": "Basato su browser!"
 		},
 		"technology": {
-		  "title": "Tecnologia unica",
-		  "description": "Collegato direttamente alla blockchain di Karbo!"
+		  "title": "Lato client",
+		  "description": "Le chiavi sono sul vostro dispositivo!"
 		},
 		"openSource": {
-		  "title": "Completamente open-source",
-		  "description": "Disponibile su Github!"
+		  "title": "Open-source",
+		  "description": "Ospitato su Github!"
 		}
 	  }
 	},
@@ -97,7 +98,9 @@
 	  },
 	  "balanceBlock": {
 		"title": "Il tuo bilancio",
-		"unlocked": "Sbloccato"
+		"total": "Totale",
+		"unlocked": "Sbloccato",
+		"pending": "In attesa"
 	  },
 	  "historyBlock": {
 		"title": "Cronologia delle transazioni",
@@ -105,7 +108,7 @@
 		"emptyWallet": "Al momento non disponi di fondi su questo portafoglio",
 		"waitSync": "Si prega di attendere la fine della sincronizzazione",
 		"beReallyPatient": "La prima sincronizzazione potrebbe richiedere alcuni minuti ...",
-		"getCoinAddress": "Ricevi MSR"
+		"getCoinAddress": "Ricevi KRB"
 	  },
 	  "txDetails":{
 		"title":"Dettagli transazione",
@@ -186,8 +189,15 @@
 	  "subtitle":"Bisogno di aiuto? siamo qui per aiutarti!",
 	  "getInTouchBlock":{
 		"title":"Mettiamoci in contatto!",
-		"content":"Se hai idee o feedback per migliorare il portafoglio, contattaci!",
+		"content":"Se hai problemi con il tuo portafoglio, contattaci!",
 		"discord":"Karbo Discord Channel"
+	  }
+	},
+	"forgotPasswordPage":{
+	  "subtitle":"Come ripristinare l'accesso al tuo portafoglio",
+	  "forgotPasswordBlock":{
+		"title":"Se hai dimenticato la password, è impossibile reimpostarla!",
+		"content":"L'unico modo per ripristinare l'accesso al tuo portafoglio è richiamare la tua password o eliminare i dati del portafoglio dalla memoria del browser e ripristinare il portafoglio dal backup (ad es. frase mnemonica di ripristino).<br /> Se disponi delle chiavi del portafoglio o di una frase di ripristino. , di seguito puoi eliminare il tuo portafoglio. Quindi sarai in grado di ripristinarlo e sincronizzarlo da zero.<br/> <strong>Per favore, assicurati di avere una frase di ripristino prima di procedere!!!</strong>"
 	  }
 	},
 	"networkPage":{
@@ -202,7 +212,7 @@
 	  }
 	},
 	"sendPage":{
-	  "title":"Invia MSR",
+	  "title":"Invia KRB",
 	  "sendBlock":{
 		"address":{
 		  "label":"Indirizzo di destinazione",
@@ -219,6 +229,10 @@
 		"paymentId":{
 		  "label":"Payment ID (opzionale)",
 		  "invalid":"Il Payment ID è invalido. La lunghezza deve essere di 16 o 64 caratteri"
+		},
+		"mixin":{
+		  "label":"Riservatezza",
+		  "invalid":"Il mixin non è valido, dovrebbe essere compreso tra 3 e 10 o zero"
 		},
 		"sendButton":"Invia",
 		"cancelButton":"Annulla"
@@ -270,7 +284,7 @@
 	  }
 	},
 	"receivePage":{
-	  "title":"Ricevi MSR",
+	  "title":"Ricevi KRB",
 	  "receiveBlock":{
 		"address":{
 		  "title":"Il tuo indirizzo per ricevere i fondi",
@@ -298,7 +312,7 @@
 	},
 	"miningPage":{
 	  "title":"Mina direttamente nel tuo browser",
-	  "subtitle":"Supporta il network minando e ricevi MSR come ricompensa",
+	  "subtitle":"Supporta il network minando e ricevi KRB come ricompensa",
 	  "parameterBlock":{
 		"title":"Parametri",
 		"labelDestinationAddress":"Portafoglio di destinazione",
@@ -335,7 +349,13 @@
 		},
 		"readMinerTx":{
 		  "label":"Leggi transazioni del miner(solo mining)"
-		}
+		},
+		  "customNode":{
+			  "label":"Use custom node"
+		  },
+		  "nodeUrl":{
+			  "label":"Node URL"
+		  }
 	  },
 	  "changePasswordButton":"Cambia la password del mio portafoglio",
 	  "deleteWalletButton":"Elimina il mio portafoglio (copia locale)",

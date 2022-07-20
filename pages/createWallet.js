@@ -1,7 +1,10 @@
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -14,7 +17,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLab/DestructableView", "../model/KeysRepository", "../model/Wallet", "../model/Password", "../providers/BlockchainExplorerProvider", "../model/Mnemonic", "../model/AppState", "../model/WalletRepository", "../model/Translations", "../model/MnemonicLang"], function (require, exports, VueAnnotate_1, DestructableView_1, KeysRepository_1, Wallet_1, Password_1, BlockchainExplorerProvider_1, Mnemonic_1, AppState_1, WalletRepository_1, Translations_1, MnemonicLang_1) {
+define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLab/DestructableView", "../model/KeysRepository", "../model/Wallet", "../model/Password", "../providers/BlockchainExplorerProvider", "../model/Mnemonic", "../model/AppState", "../model/WalletRepository", "../model/Translations", "../model/MnemonicLang", "../model/Cn"], function (require, exports, VueAnnotate_1, DestructableView_1, KeysRepository_1, Wallet_1, Password_1, BlockchainExplorerProvider_1, Mnemonic_1, AppState_1, WalletRepository_1, Translations_1, MnemonicLang_1, Cn_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var blockchainExplorer = BlockchainExplorerProvider_1.BlockchainExplorerProvider.getInstance();
@@ -33,8 +36,8 @@ define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLa
             var self = this;
             setTimeout(function () {
                 blockchainExplorer.getHeight().then(function (currentHeight) {
-                    var seed = cnUtil.sc_reduce32(cnUtil.rand_32());
-                    var keys = cnUtil.create_address(seed);
+                    var seed = Cn_1.CnNativeBride.sc_reduce32(Cn_1.CnRandom.rand_32());
+                    var keys = Cn_1.Cn.create_address(seed);
                     var newWallet = new Wallet_1.Wallet();
                     newWallet.keys = KeysRepository_1.KeysRepository.fromPriv(keys.spend.sec, keys.view.sec);
                     var height = currentHeight - 10;

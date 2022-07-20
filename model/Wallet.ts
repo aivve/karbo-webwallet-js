@@ -16,22 +16,28 @@
 import {Transaction, TransactionIn, TransactionOut} from "./Transaction";
 import {KeysRepository, UserKeys} from "./KeysRepository";
 import {Observable} from "../lib/numbersLab/Observable";
-import {CryptoUtils} from "./CryptoUtils";
+import {Cn, CnNativeBride, CnTransactions} from "./Cn";
 
 export type RawWalletOptions = {
 	checkMinerTx?:boolean,
 	readSpeed:number,
+	customNode?:boolean,
+	nodeUrl:string
 }
 
 export class WalletOptions{
 	checkMinerTx:boolean = false;
 	readSpeed:number = 10;
+	customNode:boolean = false;
+	nodeUrl:string = 'https://node.karbo.org:32448/';
 
 	static fromRaw(raw : RawWalletOptions){
 		let options = new WalletOptions();
 
 		if(typeof raw.checkMinerTx !== 'undefined')options.checkMinerTx = raw.checkMinerTx;
 		if(typeof raw.readSpeed !== 'undefined')options.readSpeed = raw.readSpeed;
+		if(typeof raw.customNode !== 'undefined')options.customNode = raw.customNode;
+		if(typeof raw.nodeUrl !== 'undefined')options.nodeUrl = raw.nodeUrl;
 
 		return options;
 	}
@@ -39,7 +45,9 @@ export class WalletOptions{
 	exportToJson() : RawWalletOptions{
 		let data : RawWalletOptions = {
 			readSpeed:this.readSpeed,
-			checkMinerTx:this.checkMinerTx
+			checkMinerTx:this.checkMinerTx,
+			customNode:this.customNode,
+			nodeUrl:this.nodeUrl
 		};
 		return data;
 	}
@@ -170,7 +178,7 @@ export class Wallet extends Observable{
 		this.modified = true;
 	}
 
-	getAll(forceReload=false) : Transaction[]{
+	getAll(forceReload = false) : Transaction[]{
 		return this.transactions.slice();
 	}
 
@@ -183,16 +191,27 @@ export class Wallet extends Observable{
 		return outs;
 	}
 
-	addNew(transaction : Transaction, replace=true){
+	addNew(transaction : Transaction, replace = true){
 		let exist = this.findWithTxPubKey(transaction.txPubKey);
 		if(!exist || replace) {
-			if(!exist)
+			if(!exist) {
 				this.transactions.push(transaction);
-			else
-				for(let tr = 0; tr < this.transactions.length; ++tr)
-					if(this.transactions[tr].txPubKey === transaction.txPubKey){
+			} else {
+				for(let tr = 0; tr < this.transactions.length; ++tr) {
+					if(this.transactions[tr].txPubKey === transaction.txPubKey) {
 						this.transactions[tr] = transaction;
 					}
+				}
+			}
+
+			// remove from unconfirmed
+			let existMem = this.findMemWithTxPubKey(transaction.txPubKey);
+			if(existMem) {
+				let trIndex = this.txsMem.indexOf(existMem);
+				if(trIndex != -1) {
+					this.txsMem.splice(trIndex, 1);
+				}
+			}
 
 			// this.saveAll();
 			this.recalculateKeyImages();
@@ -203,6 +222,13 @@ export class Wallet extends Observable{
 
 	findWithTxPubKey(pubKey : string) : Transaction|null{
 		for(let tr of this.transactions)
+			if(tr.txPubKey === pubKey)
+				return tr;
+		return null;
+	}
+
+	findMemWithTxPubKey(pubKey : string) : Transaction|null{
+		for(let tr of this.txsMem)
 			if(tr.txPubKey === pubKey)
 				return tr;
 		return null;
@@ -254,53 +280,39 @@ export class Wallet extends Observable{
 	}
 
 	getTransactionsCopy() : Transaction[]{
-		let news = [];
+		let news: any[] = [];
 		for(let transaction of this.transactions){
 			news.push(Transaction.fromRaw(transaction.export()));
 		}
+		news.sort((a,b) =>{
+			return a.timestamp - b.timestamp;
+		 })
 		return news;
 	}
 
-	get amount() : number{
+	amount() : number{
 		return this.unlockedAmount(-1);
 	}
 
 	unlockedAmount(currentBlockHeight : number = -1) : number{
 		let amount = 0;
+
 		for(let transaction of this.transactions){
 			if(!transaction.isFullyChecked())
 				continue;
 
-			// if(transaction.ins.length > 0){
-			// 	amount -= transaction.fees;
-			// }
-			if(transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-				for(let out of transaction.outs){
-					amount += out.amount;
-				}
-			for(let nin of transaction.ins){
-				amount -= nin.amount;
-			}
+			if(currentBlockHeight === -1 || transaction.isConfirmed(currentBlockHeight))
+				amount += transaction.getAmount();
 		}
 
-		// console.log(this.txsMem);
-		for(let transaction of this.txsMem){
-			// console.log(transaction.paymentId);
-			// for(let out of transaction.outs){
-			// 	amount += out.amount;
-			// }
-			if(transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-				for(let nout of transaction.outs){
-					amount += nout.amount;
-					// console.log('+'+nout.amount);
-				}
+		if(currentBlockHeight === -1) {
+			for(let transaction of this.txsMem){
+				//if(!transaction.isFullyChecked())
+				//	continue;
 
-			for(let nin of transaction.ins){
-				amount -= nin.amount;
-				// console.log('-'+nin.amount);
+				amount += transaction.getAmount();
 			}
 		}
-
 
 		return amount;
 	}
@@ -310,7 +322,7 @@ export class Wallet extends Observable{
 	}
 
 	getPublicAddress(){
-		return cnUtil.pubkeys_to_string(this.keys.pub.spend,this.keys.pub.view);
+		return Cn.pubkeys_to_string(this.keys.pub.spend, this.keys.pub.view);
 	}
 
 	recalculateIfNotViewOnly(){
@@ -327,13 +339,13 @@ export class Wallet extends Observable{
 				if(needDerivation) {
 					let derivation = '';
 					try {
-						derivation = cnUtil.generate_key_derivation(tx.txPubKey, this.keys.priv.view);//9.7ms
+						derivation = CnNativeBride.generate_key_derivation(tx.txPubKey, this.keys.priv.view);
 					} catch (e) {
 						continue;
 					}
 					for (let out of tx.outs) {
 						if (out.keyImage === '') {
-							let m_key_image = CryptoUtils.generate_key_image_helper({
+							let m_key_image = CnTransactions.generate_key_image_helper({
 								view_secret_key: this.keys.priv.view,
 								spend_secret_key: this.keys.priv.spend,
 								public_spend_key: this.keys.pub.spend,
@@ -356,7 +368,7 @@ export class Wallet extends Observable{
 
 					if(vin.amount < 0) {
 						if (this.keyImages.indexOf(vin.keyImage) != -1) {
-							// console.log('found in', vin);
+							//console.log('found in', vin);
 							let walletOuts = this.getAllOuts();
 							for (let ut of walletOuts) {
 								if (ut.keyImage == vin.keyImage) {

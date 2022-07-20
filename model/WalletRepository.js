@@ -15,6 +15,7 @@
 define(["require", "exports", "./Wallet", "./CoinUri", "./Storage"], function (require, exports, Wallet_1, CoinUri_1, Storage_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.WalletRepository = void 0;
     var WalletRepository = /** @class */ (function () {
         function WalletRepository() {
         }
@@ -30,12 +31,16 @@ define(["require", "exports", "./Wallet", "./CoinUri", "./Storage"], function (r
                 password = ('00000000000000000000000000000000' + password).slice(-32);
             }
             var privKey = new TextEncoder("utf8").encode(password);
-            console.log('open wallet with nonce', rawWallet.nonce);
+            // Fix cyrillic (non-latin) passwords
+            if (privKey.length > 32) {
+                privKey = privKey.slice(-32);
+            }
+            //console.log('open wallet with nonce', rawWallet.nonce);
             var nonce = new TextEncoder("utf8").encode(rawWallet.nonce);
             var decodedRawWallet = null;
             //detect if old type or new type of wallet
             if (typeof rawWallet.data !== 'undefined') { //RawFullyEncryptedWallet
-                console.log('new wallet format');
+                //console.log('new wallet format');
                 var rawFullyEncrypted = rawWallet;
                 var encrypted = new Uint8Array(rawFullyEncrypted.data);
                 var decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
@@ -49,7 +54,7 @@ define(["require", "exports", "./Wallet", "./CoinUri", "./Storage"], function (r
                 }
             }
             else { //RawWallet
-                console.log('old wallet format');
+                //console.log('old wallet format');
                 var oldRawWallet = rawWallet;
                 var encrypted = new Uint8Array(oldRawWallet.encryptedKeys);
                 var decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
@@ -88,6 +93,10 @@ define(["require", "exports", "./Wallet", "./CoinUri", "./Storage"], function (r
                 password = ('00000000000000000000000000000000' + password).slice(-32);
             }
             var privKey = new TextEncoder("utf8").encode(password);
+            // Fix cyrillic (non-latin) passwords
+            if (privKey.length > 32) {
+                privKey = privKey.slice(-32);
+            }
             var rawNonce = nacl.util.encodeBase64(nacl.randomBytes(16));
             var nonce = new TextEncoder("utf8").encode(rawNonce);
             var rawWallet = wallet.exportToRaw();

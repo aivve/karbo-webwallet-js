@@ -15,6 +15,7 @@
 define(["require", "exports", "./MnemonicLang"], function (require, exports, MnemonicLang_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Mnemonic = void 0;
     var crc32Type = /** @class */ (function () {
         function crc32Type() {
             this.rem_ = 0xFFFFFFFF;

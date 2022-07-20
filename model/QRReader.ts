@@ -84,53 +84,30 @@ class QRReader{
 				});
 		}
 
-		// if (!window.iOS) {
-		navigator.mediaDevices.enumerateDevices()
-			.then(function (devices) {
-				console.log(devices);
-				let supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
-				console.log(supportedConstraints);
-				let device = devices.filter(function(device) {
-					let deviceLabel = device.label.split(',')[1];
-					if (device.kind == "videoinput") {
-						return device;
-					}
-				});
+		navigator.mediaDevices.enumerateDevices().then(function (devices) {
+      //console.log(devices);
+      let supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
+      //console.log(supportedConstraints);
+      let device = devices.filter(function(device) {
+        let deviceLabel = device.label.split(',')[1];
+        if (device.kind == "videoinput") {
+          return device;
+        }
+      });
 
-				if (device.length > 1) {
-					let constraints = {
-						facingMode: 'environment',
-						video: {
-							mandatory: {
-								sourceId: device[1].deviceId ? device[1].deviceId : null
-							}
-						},
-						audio: false
-					};
-
-					startCapture(<MediaStreamConstraints>constraints);
-				}
-				else if (device.length) {
-					let constraints = {
-						facingMode: 'environment',
-						video: {
-							mandatory: {
-								sourceId: device[0].deviceId ? device[0].deviceId : null
-							}
-						},
-						audio: false
-					};
-
-					startCapture(<MediaStreamConstraints>constraints);
-				}
-				else {
-					startCapture({video:true});
-				}
-			})
-			.catch(function (error) {
-				showErrorMsg(error);
-			});
-		// }
+      if (device.length) {
+        startCapture({
+          audio: false,
+          video: {
+            facingMode: 'environment'
+          }
+        });
+      } else {
+        startCapture({video:true});
+      }      
+    }).catch(function (error) {
+      showErrorMsg(error);
+    });
 
 		function showErrorMsg(error : string) {
 			if(''+error === 'DOMException: Permission denied'){
@@ -141,7 +118,7 @@ class QRReader{
 					confirmButtonText:i18n.t('global.permissionRequiredForCameraModal.confirmText'),
 				});
 			}
-			console.log('unable access camera');
+			//console.log('unable access camera');
 		}
 	}
 
@@ -164,7 +141,7 @@ class QRReader{
 			if(self.ctx === null || self.webcam === null || self.canvas === null || self.decoder === null)
 				return;
 
-//			console.log('new frame');
+//			//console.log('new frame');
 			if (!self.active) return;
 			try {
 				self.ctx.drawImage(self.webcam, 0, 0, self.canvas.width, self.canvas.height);
@@ -174,8 +151,14 @@ class QRReader{
 					self.decoder.postMessage(imgData);
 				}
 			} catch(e) {
+				let errorName = "";
+
+				if (e instanceof Error) {
+				  errorName = e.name;
+				}
+				
 				// Try-Catch to circumvent Firefox Bug #879717
-				if (e.name == "NS_ERROR_NOT_AVAILABLE") setTimeout(newDecoderFrame, 0);
+				if (errorName == "NS_ERROR_NOT_AVAILABLE") setTimeout(newDecoderFrame, 0);
 			}
 		}
 

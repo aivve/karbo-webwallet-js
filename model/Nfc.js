@@ -1,6 +1,7 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Nfc = void 0;
     var Nfc = /** @class */ (function () {
         function Nfc() {
             var _this = this;
@@ -59,7 +60,7 @@ define(["require", "exports"], function (require, exports) {
             get: function () {
                 return this._nativeNfc;
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Object.defineProperty(Nfc.prototype, "writableNfc", {
@@ -67,7 +68,7 @@ define(["require", "exports"], function (require, exports) {
                 //TODO return true on andorid only
                 return this._nativeNfc ? true : false;
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Object.defineProperty(Nfc.prototype, "enabled", {
@@ -88,7 +89,7 @@ define(["require", "exports"], function (require, exports) {
                 }
                 return Promise.reject(Nfc.ERROR_NO_NFC);
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         Nfc.prototype.listenNdef = function (callback) {

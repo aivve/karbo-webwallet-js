@@ -1,7 +1,7 @@
 {
   "website":{
-	"title":"Offizielle Karbo Web Wallet",
-	"description":"Offizielle Online Wallet für Karbo currency, anonym, sicher und für optimale Sicherheit vollständig in deinem Browser verwaltet"
+	"title":"Karbo Geldbörse",
+	"description":"Offizielle Online Wallet für Karbo Kryptowährung, anonym, sicher und für optimale Sicherheit vollständig in deinem Browser verwaltet"
   },
   "messages": {
 	"menu": {
@@ -12,7 +12,7 @@
 	  "export": "Export",
 	  "donate": "Spenden",
 	  "settings": "Einstellungen",
-	  "disconnect": "Verbindung trennen",
+	  "disconnect": "Ausloggen",
 	  "network": "Netzwerkstatus",
 	  "mining": "Minen"
 	},
@@ -31,7 +31,8 @@
 	  "openWalletModal":{
 		"title":"Wallet Passwort",
 		"confirmText":"Öffnen",
-		"cancelText":"Abbrechen"
+		"cancelText":"Abbrechen",
+		"forgotPassword": "Passwort vergessen?"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Uups...",
@@ -63,7 +64,7 @@
 	  "github": "GitHub"
 	},
 	"homepage": {
-	  "mainTitle": "Gesicherte Karbo Wallet",
+	  "mainTitle": "Willkommen bei Karbo Wallet",
 	  "tagLine": "Der einfachste Weg Karbo jederzeit und überall zu nutzen",
 	  "actions": {
 		"loadWallet": "Lade meine Wallet",
@@ -73,20 +74,20 @@
 	  },
 	  "notes": {
 		"secure": {
-		  "title": "Sicher",
-		  "description": "Keine Server, voll verschlüsselt!"
+		  "title": "Sichern",
+		  "description": "Voll verschlüsselt!"
 		},
 		"fast": {
-		  "title": "Schnell",
-		  "description": "Sende jederzeit, von überall!"
+		  "title": "Zugänglich",
+		  "description": "Browserbasiert!"
 		},
 		"technology": {
-		  "title": "Einzigartige Technologie",
-		  "description": "Direkt mit der Karbo Blockchain verbunden!"
+		  "title": "Clientseitige",
+		  "description": "Schlüssel werden auf Ihrem Gerät aufbewahrt!"
 		},
 		"openSource": {
-		  "title": "Komplett open-source",
-		  "description": "Vergügbar auf Github"
+		  "title": "Open-source",
+		  "description": "Auf Github gehostet!"
 		}
 	  }
 	},
@@ -98,7 +99,9 @@
 	  },
 	  "balanceBlock": {
 		"title": "Dein Guthaben",
-		"unlocked": "Entsperrt"
+		"total": "Gesamt",
+		"unlocked": "Entsperrt",
+		"pending": "Ausstehend"
 	  },
 	  "historyBlock": {
 		"title": "Transaktionshistorie",
@@ -187,8 +190,15 @@
 	  "subtitle":"Du brauchst Hilfe, wir sind hier um zu helfen!",
 	  "getInTouchBlock":{
 		"title":"Nehmen wir Kontakt auf!",
-		"content":"Wenn du Ideen oder Feedback hast um die Wallet zu verbessern, kontaktiere uns!",
+		"content":"Wenn Sie Probleme mit Ihrer Brieftasche haben, schreiben Sie uns!",
 		"discord":"Karbo Discord Channel"
+	  }
+	},
+	"forgotPasswordPage":{
+	  "subtitle":"So stellen Sie den Zugriff auf Ihre Brieftasche wieder her",
+	  "forgotPasswordBlock":{
+		"title":"Wenn Sie das Passwort vergessen haben, können Sie es nicht zurücksetzen!",
+		"content":"Die einzige Möglichkeit, den Zugriff auf Ihre Brieftasche wiederherzustellen, besteht darin, Ihr Passwort abzurufen oder Brieftaschendaten aus dem Speicher Ihres Browsers zu löschen und die Brieftasche aus dem Backup wiederherzustellen (z. B. mnemonische Wiederherstellungsphrase).<br /> Wenn Sie Brieftaschenschlüssel oder eine Wiederherstellungsphrase haben , unten können Sie Ihre Brieftasche löschen. Dann können Sie es wiederherstellen und von Grund auf neu synchronisieren.<br/> <strong>Bitte stellen Sie sicher, dass Sie einen Wiederherstellungssatz haben, bevor Sie fortfahren!!!</strong>"
 	  }
 	},
 	"networkPage":{
@@ -220,6 +230,10 @@
 		"paymentId":{
 		  "label":"Payment ID (optional)",
 		  "invalid":"Die payment ID ist ungültig. Sie muss aus 16 oder 64 Zeichen bestehen"
+		},
+		"mixin":{
+		  "label":"Geheimhaltung",
+		  "invalid":"Das Mixin ist ungültig, sollte zwischen 3 und 10 oder null liegen"
 		},
 		"sendButton":"Senden",
 		"cancelButton":"Abbrechen"
@@ -336,6 +350,12 @@
 		},
 		"readMinerTx":{
 		  "label":"Miner Transaktionen lesen (nur für Leute die solo minen)"
+		},
+		"customNode":{
+		  "label":"Use custom node"
+		},
+		"nodeUrl":{
+		  "label":"Node URL"
 		}
 	  },
 	  "changePasswordButton":"Ändere mein Wallet Passwort",

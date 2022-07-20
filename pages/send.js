@@ -13,9 +13,12 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -28,7 +31,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numbersLab/VueAnnotate", "../model/TransactionsExplorer", "../model/blockchain/BlockchainExplorerRpc2", "../lib/numbersLab/DependencyInjector", "../model/Wallet", "../utils/Url", "../model/CoinUri", "../model/QRReader", "../model/AppState", "../providers/BlockchainExplorerProvider", "../model/Nfc"], function (require, exports, DestructableView_1, VueAnnotate_1, TransactionsExplorer_1, BlockchainExplorerRpc2_1, DependencyInjector_1, Wallet_1, Url_1, CoinUri_1, QRReader_1, AppState_1, BlockchainExplorerProvider_1, Nfc_1) {
+define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numbersLab/VueAnnotate", "../model/TransactionsExplorer", "../lib/numbersLab/DependencyInjector", "../model/Wallet", "../utils/Url", "../model/CoinUri", "../model/QRReader", "../model/AppState", "../providers/BlockchainExplorerProvider", "../model/Nfc", "../model/Cn", "../model/WalletWatchdog"], function (require, exports, DestructableView_1, VueAnnotate_1, TransactionsExplorer_1, DependencyInjector_1, Wallet_1, Url_1, CoinUri_1, QRReader_1, AppState_1, BlockchainExplorerProvider_1, Nfc_1, Cn_1, WalletWatchdog_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var wallet = DependencyInjector_1.DependencyInjectorInstance().getInstance(Wallet_1.Wallet.name, 'default', false);
@@ -64,7 +67,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
             this.lockedForm = false;
             this.destinationAddressUser = '';
             this.destinationAddress = '';
-            this.amountToSend = '10.5';
+            this.amountToSend = '0';
             this.destinationAddressValid = false;
             this.openAliasValid = false;
             this.qrScanning = false;
@@ -72,6 +75,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
             this.domainAliasAddress = null;
             this.txDestinationName = null;
             this.txDescription = null;
+            this.mixIn = config.defaultMixin.toString();
             this.stopScan();
         };
         SendView.prototype.startNfcScan = function () {
@@ -139,7 +143,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
             }
         };
         SendView.prototype.handleScanResult = function (result) {
-            console.log('Scan result:', result);
+            //console.log('Scan result:', result);
             var self = this;
             var parsed = false;
             try {
@@ -154,7 +158,8 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                         self.amountToSend = txDetails.amount;
                         self.lockedForm = true;
                     }
-                    // if(typeof txDetails.paymentId !== 'undefined')self.paymentId = txDetails.paymentId;
+                    if (typeof txDetails.paymentId !== 'undefined')
+                        self.paymentId = txDetails.paymentId;
                     parsed = true;
                 }
             }
@@ -176,7 +181,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
         SendView.prototype.stopScan = function () {
             if (typeof window.QRScanner !== 'undefined') {
                 window.QRScanner.cancelScan(function (status) {
-                    console.log(status);
+                    //console.log(status);
                 });
                 window.QRScanner.hide();
                 $('body').removeClass('transparent');
@@ -222,8 +227,9 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                             swal.showLoading();
                         }
                     });
-                    TransactionsExplorer_1.TransactionsExplorer.createTx([{ address: destinationAddress_1, amount: amountToSend }], self.paymentId, wallet, blockchainHeight, function (numberOuts) {
-                        return blockchainExplorer.getRandomOuts(numberOuts);
+                    var mixinToSendWith = parseInt(self.mixIn);
+                    TransactionsExplorer_1.TransactionsExplorer.createTx([{ address: destinationAddress_1, amount: amountToSend }], self.paymentId, wallet, blockchainHeight, function (amounts, numberOuts) {
+                        return blockchainExplorer.getRandomOuts(amounts, numberOuts);
                     }, function (amount, feesAmount) {
                         if (amount + feesAmount > wallet.unlockedAmount(blockchainHeight)) {
                             swal({
@@ -266,12 +272,12 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                                 }).catch(reject);
                             }, 1);
                         });
-                    }).then(function (rawTxData) {
+                    }, mixinToSendWith).then(function (rawTxData) {
                         blockchainExplorer.sendRawTx(rawTxData.raw.raw).then(function () {
                             //save the tx private key
-                            wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvKey);
+                            wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvkey);
                             //force a mempool check so the user is up to date
-                            var watchdog = DependencyInjector_1.DependencyInjectorInstance().getInstance(BlockchainExplorerRpc2_1.WalletWatchdog.name);
+                            var watchdog = DependencyInjector_1.DependencyInjectorInstance().getInstance(WalletWatchdog_1.WalletWatchdog.name);
                             if (watchdog !== null)
                                 watchdog.checkMempool();
                             var promise = Promise.resolve();
@@ -283,6 +289,9 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                                     title: i18n.t('sendPage.thankYouDonationModal.title'),
                                     text: i18n.t('sendPage.thankYouDonationModal.content'),
                                     confirmButtonText: i18n.t('sendPage.thankYouDonationModal.confirmText'),
+                                    onClose: function () {
+                                        window.location.href = '#!account';
+                                    }
                                 });
                             }
                             else
@@ -290,6 +299,9 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                                     type: 'success',
                                     title: i18n.t('sendPage.transferSentModal.title'),
                                     confirmButtonText: i18n.t('sendPage.transferSentModal.confirmText'),
+                                    onClose: function () {
+                                        window.location.href = '#!account';
+                                    }
                                 });
                             promise.then(function () {
                                 if (self.redirectUrlAfterSend !== null) {
@@ -306,7 +318,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                         });
                         swal.close();
                     }).catch(function (error) {
-                        console.log(error);
+                        //console.log(error);
                         if (error && error !== '') {
                             if (typeof error === 'string')
                                 swal({
@@ -343,7 +355,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                 this.timeoutResolveAlias = setTimeout(function () {
                     blockchainExplorer.resolveOpenAlias(self_1.destinationAddressUser).then(function (data) {
                         try {
-                            // cnUtil.decode_address(data.address);
+                            Cn_1.Cn.decode_address(data.address);
                             self_1.txDestinationName = data.name;
                             self_1.destinationAddress = data.address;
                             self_1.domainAliasAddress = data.address;
@@ -364,7 +376,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
             else {
                 this.openAliasValid = true;
                 try {
-                    cnUtil.decode_address(this.destinationAddressUser);
+                    Cn_1.Cn.decode_address(this.destinationAddressUser);
                     this.destinationAddressValid = true;
                     this.destinationAddress = this.destinationAddressUser;
                 }
@@ -391,6 +403,17 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
                 this.paymentIdValid = false;
             }
         };
+        SendView.prototype.mixinWatch = function () {
+            try {
+                this.mixinIsValid = !isNaN(parseFloat(this.mixIn));
+                var mixin = parseFloat(this.mixIn);
+                if (mixin > 10 || (mixin < 3 && mixin !== 0))
+                    this.mixinIsValid = false;
+            }
+            catch (e) {
+                this.mixinIsValid = false;
+            }
+        };
         __decorate([
             VueAnnotate_1.VueVar('')
         ], SendView.prototype, "destinationAddressUser", void 0);
@@ -401,7 +424,7 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
             VueAnnotate_1.VueVar(false)
         ], SendView.prototype, "destinationAddressValid", void 0);
         __decorate([
-            VueAnnotate_1.VueVar('10.5')
+            VueAnnotate_1.VueVar('0')
         ], SendView.prototype, "amountToSend", void 0);
         __decorate([
             VueAnnotate_1.VueVar(false)
@@ -415,6 +438,12 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
         __decorate([
             VueAnnotate_1.VueVar(true)
         ], SendView.prototype, "paymentIdValid", void 0);
+        __decorate([
+            VueAnnotate_1.VueVar('3')
+        ], SendView.prototype, "mixIn", void 0);
+        __decorate([
+            VueAnnotate_1.VueVar(true)
+        ], SendView.prototype, "mixinIsValid", void 0);
         __decorate([
             VueAnnotate_1.VueVar(null)
         ], SendView.prototype, "domainAliasAddress", void 0);
@@ -445,6 +474,9 @@ define(["require", "exports", "../lib/numbersLab/DestructableView", "../lib/numb
         __decorate([
             VueAnnotate_1.VueWatched()
         ], SendView.prototype, "paymentIdWatch", null);
+        __decorate([
+            VueAnnotate_1.VueWatched()
+        ], SendView.prototype, "mixinWatch", null);
         return SendView;
     }(DestructableView_1.DestructableView));
     if (wallet !== null && blockchainExplorer !== null)

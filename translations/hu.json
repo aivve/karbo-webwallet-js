@@ -1,6 +1,6 @@
 {
   "website":{
-	"title":"Hivatalos Karbo webtárca",
+	"title":"Karbo tárca",
 	"description":"A Karbo hivatalos online tárcája - névtelen, biztonságos és teljes mértékben böngészőből kezelt az optimális biztonság érdekében"
   },
   "messages": {
@@ -31,7 +31,8 @@
 	  "openWalletModal":{
 		"title":"Tárca jelszava",
 		"confirmText":"Megnyitás",
-		"cancelText":"Mégsem"
+		"cancelText":"Mégsem",
+		"forgotPassword": "Elfelejtetted a jelszavad?"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Hupsz...",
@@ -63,7 +64,7 @@
 	  "github": "GitHub"
 	},
 	"homepage": {
-	  "mainTitle": "Biztonságos Karbo tárca",
+	  "mainTitle": "Üdvözöljük a Karbo tárca",
 	  "tagLine": "A Karbo használatának legegyszerűbb módja - bárhol és bármikor",
 	  "actions": {
 		"loadWallet": "Tárca betöltése",
@@ -77,16 +78,16 @@
 		  "description": "Nincsenek szerverek, teljesen titkosított!"
 		},
 		"fast": {
-		  "title": "Gyors",
-		  "description": "Küldj bárhonnan, bármikor!"
+		  "title": "Hozzáférhető",
+		  "description": "Böngésző alapú!"
 		},
 		"technology": {
-		  "title": "Egyedi technológia",
-		  "description": "Közvetlen kapcsolat a Karbo blokklánccal!"
+		  "title": "Ügyfél oldal",
+		  "description": "Kulcsok a készüléken!"
 		},
 		"openSource": {
-		  "title": "Teljesen nyílt forrású",
-		  "description": "Elérhető a Githubon!"
+		  "title": "Nyílt forráskód",
+		  "description": "Házigazda a Githubon!"
 		}
 	  }
 	},
@@ -98,7 +99,9 @@
 	  },
 	  "balanceBlock": {
 		"title": "Egyenleg",
-		"unlocked": "Feloldva"
+		"total": "Teljes",
+		"unlocked": "Feloldva",
+		"pending": "Függőben"
 	  },
 	  "historyBlock": {
 		"title": "Tranzakciós előzmények",
@@ -187,8 +190,15 @@
 	  "subtitle":"Itt vagyunk, hogy segítsünk!",
 	  "getInTouchBlock":{
 		"title":"Lépjünk kapcsolatba!",
-		"content":"Visszajelzésed vagy ötleted van a tárcával kapcsolatban? Keress fel bennünket!",
+		"content":"Ha bármilyen problémája van a pénztárcájával, forduljon hozzánk!",
 		"discord":"Karbo Discord-csatorna"
+	  }
+	},
+	"forgotPasswordPage":{
+	  "subtitle":"Hogyan lehet visszaállítani a hozzáférést a pénztárcájához",
+	  "forgotPasswordBlock":{
+		"title":"Ha elfelejtette a jelszót, azt lehetetlen visszaállítani!",
+		"content":"A pénztárcájához való hozzáférés visszaállításának egyetlen módja, ha előhívja jelszavát, vagy törli a pénztárca adatait a böngésző memóriájából, és visszaállítja a pénztárcát a biztonsági másolatból (pl. mnemonikus helyreállítási kifejezés).<br /> Ha rendelkezik pénztárcakulcsokkal vagy helyreállítási kifejezéssel. , lent törölheti pénztárcáját. Ezután visszaállíthatja és a semmiből szinkronizálhatja.<br/> <strong>Kérjük, győződjön meg róla, hogy rendelkezik helyreállítási kifejezéssel, mielőtt továbblép!!!</strong>"
 	  }
 	},
 	"networkPage":{
@@ -220,6 +230,10 @@
 		"paymentId":{
 		  "label":"Fizetési azonosító (opcionális)",
 		  "invalid":"Érvénytelen fizetési azonosító. Hosszának 16 vagy 64 karakternek kell lennie"
+		},
+		"mixin":{
+		  "label":"Magánélet",
+		  "invalid":"A mixin érvénytelen, 3 és 10 között vagy nulla lehet"
 		},
 		"sendButton":"Küldés",
 		"cancelButton":"Mégsem"
@@ -336,7 +350,13 @@
 		},
 		"readMinerTx":{
 		  "label":"Bányászási tranzakciók beolvasása (csak egyedülálló bányászás esetén)"
-		}
+		},
+		  "customNode":{
+			  "label":"Use custom node"
+		  },
+		  "nodeUrl":{
+			  "label":"Node URL"
+		  }
 	  },
 	  "changePasswordButton":"Jelszómódosítás",
 	  "deleteWalletButton":"Tárca törlése (helyi másolat)",

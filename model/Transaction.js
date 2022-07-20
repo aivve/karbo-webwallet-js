@@ -1,20 +1,39 @@
-/*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+/**
+ *	   Copyright (c) 2018, Gnock
+ *     Copyright (c) 2018-2020, ExploShot
+ *     Copyright (c) 2018-2020, The Qwertycoin Project
+ *     Copyright (c) 2018-2020, The Masari Project
+ *     Copyright (c) 2014-2018, MyMonero.com
  *
- * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+ *     All rights reserved.
+ *     Redistribution and use in source and binary forms, with or without modification,
+ *     are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+ *     ==> Redistributions of source code must retain the above copyright notice,
+ *         this list of conditions and the following disclaimer.
+ *     ==> Redistributions in binary form must reproduce the above copyright notice,
+ *         this list of conditions and the following disclaimer in the documentation
+ *         and/or other materials provided with the distribution.
+ *     ==> Neither the name of Qwertycoin nor the names of its contributors
+ *         may be used to endorse or promote products derived from this software
+ *          without specific prior written permission.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *     "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *     LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *     A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ *     CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ *     EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *     PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *     PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ *     LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *     NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ *     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Transaction = exports.TransactionIn = exports.TransactionOut = void 0;
     var TransactionOut = /** @class */ (function () {
         function TransactionOut() {
             this.amount = 0;
@@ -23,6 +42,9 @@ define(["require", "exports"], function (require, exports) {
             this.globalIndex = 0;
             this.ephemeralPub = '';
             this.pubKey = '';
+            this.rtcOutPk = '';
+            this.rtcMask = '';
+            this.rtcAmount = '';
         }
         TransactionOut.fromRaw = function (raw) {
             var nout = new TransactionOut();
@@ -30,10 +52,16 @@ define(["require", "exports"], function (require, exports) {
             nout.outputIdx = raw.outputIdx;
             nout.globalIndex = raw.globalIndex;
             nout.amount = raw.amount;
-            if (typeof raw.pubKey !== 'undefined')
-                nout.pubKey = raw.pubKey;
             if (typeof raw.ephemeralPub !== 'undefined')
                 nout.ephemeralPub = raw.ephemeralPub;
+            if (typeof raw.pubKey !== 'undefined')
+                nout.pubKey = raw.pubKey;
+            if (typeof raw.rtcOutPk !== 'undefined')
+                nout.rtcOutPk = raw.rtcOutPk;
+            if (typeof raw.rtcMask !== 'undefined')
+                nout.rtcMask = raw.rtcMask;
+            if (typeof raw.rtcAmount !== 'undefined')
+                nout.rtcAmount = raw.rtcAmount;
             return nout;
         };
         TransactionOut.prototype.export = function () {
@@ -43,6 +71,14 @@ define(["require", "exports"], function (require, exports) {
                 globalIndex: this.globalIndex,
                 amount: this.amount,
             };
+            if (this.rtcOutPk !== '')
+                data.rtcOutPk = this.rtcOutPk;
+            if (this.rtcMask !== '')
+                data.rtcMask = this.rtcMask;
+            if (this.rtcAmount !== '')
+                data.rtcAmount = this.rtcAmount;
+            if (this.ephemeralPub !== '')
+                data.ephemeralPub = this.ephemeralPub;
             if (this.pubKey !== '')
                 data.pubKey = this.pubKey;
             return data;
@@ -152,10 +188,14 @@ define(["require", "exports"], function (require, exports) {
             }
             return amount;
         };
+        Transaction.prototype.isCoinbase = function () {
+            //return this.outs.length == 1 && this.outs[0].rtcAmount === '';
+            return this.ins.length == 0;
+        };
         Transaction.prototype.isConfirmed = function (blockchainHeight) {
-            if (this.blockHeight + config.txMinConfirms < blockchainHeight) {
+            var confirmations = this.blockHeight + (this.isCoinbase() ? config.txCoinbaseMinConfirms : config.txMinConfirms);
+            if (confirmations < blockchainHeight)
                 return true;
-            }
             return false;
         };
         Transaction.prototype.isFullyChecked = function () {

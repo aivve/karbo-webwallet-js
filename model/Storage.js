@@ -15,6 +15,7 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Storage = void 0;
     var LocalStorage = /** @class */ (function () {
         function LocalStorage() {
         }
@@ -68,7 +69,7 @@ define(["require", "exports"], function (require, exports) {
             return new Promise(function (resolve, reject) {
                 if (window.NativeStorage)
                     window.NativeStorage.getItem(key, function () {
-                        resolve();
+                        resolve(true);
                     }, function (error) {
                         if (error.code === 2)
                             resolve(defaultValue);

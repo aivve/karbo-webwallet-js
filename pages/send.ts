@@ -16,21 +16,20 @@
 import {DestructableView} from "../lib/numbersLab/DestructableView";
 import {VueRequireFilter, VueVar, VueWatched} from "../lib/numbersLab/VueAnnotate";
 import {TransactionsExplorer} from "../model/TransactionsExplorer";
-import {WalletRepository} from "../model/WalletRepository";
-import {BlockchainExplorerRpc2, WalletWatchdog} from "../model/blockchain/BlockchainExplorerRpc2";
 import {Autowire, DependencyInjectorInstance} from "../lib/numbersLab/DependencyInjector";
-import {Constants} from "../model/Constants";
 import {Wallet} from "../model/Wallet";
-import {BlockchainExplorer} from "../model/blockchain/BlockchainExplorer";
 import {Url} from "../utils/Url";
 import {CoinUri} from "../model/CoinUri";
 import {QRReader} from "../model/QRReader";
 import {AppState} from "../model/AppState";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
 import {NdefMessage, Nfc} from "../model/Nfc";
+import {BlockchainExplorer, RawDaemon_Out} from "../model/blockchain/BlockchainExplorer";
+import {Cn} from "../model/Cn";
+import {WalletWatchdog} from "../model/WalletWatchdog";
 
 let wallet: Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
-let blockchainExplorer: BlockchainExplorerRpc2 = BlockchainExplorerProvider.getInstance();
+let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
 
 AppState.enableLeftMenu();
 
@@ -38,11 +37,13 @@ class SendView extends DestructableView {
 	@VueVar('') destinationAddressUser !: string;
 	@VueVar('') destinationAddress !: string;
 	@VueVar(false) destinationAddressValid !: boolean;
-	@VueVar('10.5') amountToSend !: string;
+	@VueVar('0') amountToSend !: string;
 	@VueVar(false) lockedForm !: boolean;
 	@VueVar(true) amountToSendValid !: boolean;
 	@VueVar('') paymentId !: string;
 	@VueVar(true) paymentIdValid !: boolean;
+	@VueVar('3') mixIn !: string;
+	@VueVar(true) mixinIsValid !: boolean;
 
 	@VueVar(null) domainAliasAddress !: string | null;
 	@VueVar(null) txDestinationName !: string | null;
@@ -79,7 +80,7 @@ class SendView extends DestructableView {
 		this.lockedForm = false;
 		this.destinationAddressUser = '';
 		this.destinationAddress = '';
-		this.amountToSend = '10.5';
+		this.amountToSend = '0';
 		this.destinationAddressValid = false;
 		this.openAliasValid = false;
 		this.qrScanning = false;
@@ -87,6 +88,7 @@ class SendView extends DestructableView {
 		this.domainAliasAddress = null;
 		this.txDestinationName = null;
 		this.txDescription = null;
+		this.mixIn = config.defaultMixin.toString();
 
 		this.stopScan();
 	}
@@ -158,7 +160,7 @@ class SendView extends DestructableView {
 	}
 
 	handleScanResult(result : string){
-		console.log('Scan result:', result);
+		//console.log('Scan result:', result);
 		let self = this;
 		let parsed = false;
 		try {
@@ -171,7 +173,7 @@ class SendView extends DestructableView {
 					self.amountToSend = txDetails.amount;
 					self.lockedForm = true;
 				}
-				// if(typeof txDetails.paymentId !== 'undefined')self.paymentId = txDetails.paymentId;
+				if(typeof txDetails.paymentId !== 'undefined')self.paymentId = txDetails.paymentId;
 				parsed = true;
 			}
 		} catch (e) {
@@ -194,7 +196,7 @@ class SendView extends DestructableView {
 	stopScan() {
 		if(typeof window.QRScanner !== 'undefined') {
 			window.QRScanner.cancelScan(function (status:any){
-				console.log(status);
+				//console.log(status);
 			});
 			window.QRScanner.hide();
 			$('body').removeClass('transparent');
@@ -245,9 +247,12 @@ class SendView extends DestructableView {
 						swal.showLoading();
 					}
 				});
+
+				let mixinToSendWith: number = parseInt(self.mixIn);
+
 				TransactionsExplorer.createTx([{address: destinationAddress, amount: amountToSend}], self.paymentId, wallet, blockchainHeight,
-					function (numberOuts: number): Promise<any[]> {
-						return blockchainExplorer.getRandomOuts(numberOuts);
+					function (amounts: number[], numberOuts: number): Promise<RawDaemon_Out[]> {
+						return blockchainExplorer.getRandomOuts(amounts, numberOuts);
 					}
 					, function (amount: number, feesAmount: number): Promise<void> {
 						if (amount + feesAmount > wallet.unlockedAmount(blockchainHeight)) {
@@ -291,10 +296,11 @@ class SendView extends DestructableView {
 								}).catch(reject);
 							}, 1);
 						});
-					}).then(function (rawTxData: { raw: { hash: string, prvKey: string, raw: string }, signed: any }) {
+					},
+					mixinToSendWith).then(function (rawTxData: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
 					blockchainExplorer.sendRawTx(rawTxData.raw.raw).then(function () {
 						//save the tx private key
-						wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvKey);
+						wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvkey);
 
 						//force a mempool check so the user is up to date
 						let watchdog: WalletWatchdog = DependencyInjectorInstance().getInstance(WalletWatchdog.name);
@@ -312,12 +318,18 @@ class SendView extends DestructableView {
 								title: i18n.t('sendPage.thankYouDonationModal.title'),
 								text: i18n.t('sendPage.thankYouDonationModal.content'),
 								confirmButtonText: i18n.t('sendPage.thankYouDonationModal.confirmText'),
+								onClose: () => {
+									window.location.href = '#!account';
+								}
 							});
 						} else
 							promise = swal({
 								type: 'success',
 								title: i18n.t('sendPage.transferSentModal.title'),
 								confirmButtonText: i18n.t('sendPage.transferSentModal.confirmText'),
+								onClose: () => {
+									window.location.href = '#!account';
+								}
 							});
 
 						promise.then(function () {
@@ -335,7 +347,7 @@ class SendView extends DestructableView {
 					});
 					swal.close();
 				}).catch(function (error: any) {
-					console.log(error);
+					//console.log(error);
 					if (error && error !== '') {
 						if (typeof error === 'string')
 							swal({
@@ -373,10 +385,10 @@ class SendView extends DestructableView {
 			if (this.timeoutResolveAlias !== 0)
 				clearTimeout(this.timeoutResolveAlias);
 
-			this.timeoutResolveAlias = setTimeout(function () {
+			this.timeoutResolveAlias = <any>setTimeout(function () {
 				blockchainExplorer.resolveOpenAlias(self.destinationAddressUser).then(function (data: { address: string, name: string | null }) {
 					try {
-						// cnUtil.decode_address(data.address);
+						Cn.decode_address(data.address);
 						self.txDestinationName = data.name;
 						self.destinationAddress = data.address;
 						self.domainAliasAddress = data.address;
@@ -395,7 +407,7 @@ class SendView extends DestructableView {
 		} else {
 			this.openAliasValid = true;
 			try {
-				cnUtil.decode_address(this.destinationAddressUser);
+				Cn.decode_address(this.destinationAddressUser);
 				this.destinationAddressValid = true;
 				this.destinationAddress = this.destinationAddressUser;
 			} catch (e) {
@@ -425,6 +437,19 @@ class SendView extends DestructableView {
 		}
 	}
 
+	@VueWatched()
+	mixinWatch() {
+		try {
+			this.mixinIsValid = !isNaN(parseFloat(this.mixIn));
+
+			let mixin: number =  parseFloat(this.mixIn);
+			if (mixin > 10 || (mixin < 3 && mixin !== 0))
+			    this.mixinIsValid = false;
+
+		} catch (e) {
+			this.mixinIsValid = false;
+		}
+	}
 }
 
 

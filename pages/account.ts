@@ -28,6 +28,7 @@ class AccountView extends DestructableView{
 	@VueVar([]) transactions !: Transaction[];
 	@VueVar(0) walletAmount !: number;
 	@VueVar(0) unlockedWalletAmount !: number;
+	@VueVar(0) ticker !: string;
 
 	@VueVar(0) currentScanBlock !: number;
 	@VueVar(0) blockchainHeight !: number;
@@ -38,10 +39,13 @@ class AccountView extends DestructableView{
 	constructor(container : string){
 		super(container);
 		let self = this;
+
+		this.ticker = config.coinSymbol;
+
 		AppState.enableLeftMenu();
-		this.intervalRefresh = setInterval(function(){
+		this.intervalRefresh = <any>setInterval(function(){
 			self.refresh();
-		}, 1*1000);
+		}, 1000);
 		this.refresh();
 	}
 
@@ -91,9 +95,9 @@ class AccountView extends DestructableView{
 
 	refreshWallet(){
 		this.currentScanBlock = wallet.lastHeight;
-		this.walletAmount = wallet.amount;
+		this.walletAmount = wallet.amount();
 		this.unlockedWalletAmount = wallet.unlockedAmount(this.currentScanBlock);
-		if(wallet.getAll().length+wallet.txsMem.length !== this.transactions.length) {
+		if(wallet.getAll().length + wallet.txsMem.length !== this.transactions.length) {
 			this.transactions = wallet.txsMem.concat(wallet.getTransactionsCopy().reverse());
 		}
 	}

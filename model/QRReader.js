@@ -15,6 +15,7 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.QRReader = void 0;
     var QRReader = /** @class */ (function () {
         function QRReader() {
             this.active = false;
@@ -70,50 +71,30 @@ define(["require", "exports"], function (require, exports) {
                     showErrorMsg(err);
                 });
             }
-            // if (!window.iOS) {
-            navigator.mediaDevices.enumerateDevices()
-                .then(function (devices) {
-                console.log(devices);
+            navigator.mediaDevices.enumerateDevices().then(function (devices) {
+                //console.log(devices);
                 var supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
-                console.log(supportedConstraints);
+                //console.log(supportedConstraints);
                 var device = devices.filter(function (device) {
                     var deviceLabel = device.label.split(',')[1];
                     if (device.kind == "videoinput") {
                         return device;
                     }
                 });
-                if (device.length > 1) {
-                    var constraints = {
-                        facingMode: 'environment',
+                if (device.length) {
+                    startCapture({
+                        audio: false,
                         video: {
-                            mandatory: {
-                                sourceId: device[1].deviceId ? device[1].deviceId : null
-                            }
-                        },
-                        audio: false
-                    };
-                    startCapture(constraints);
-                }
-                else if (device.length) {
-                    var constraints = {
-                        facingMode: 'environment',
-                        video: {
-                            mandatory: {
-                                sourceId: device[0].deviceId ? device[0].deviceId : null
-                            }
-                        },
-                        audio: false
-                    };
-                    startCapture(constraints);
+                            facingMode: 'environment'
+                        }
+                    });
                 }
                 else {
                     startCapture({ video: true });
                 }
-            })
-                .catch(function (error) {
+            }).catch(function (error) {
                 showErrorMsg(error);
             });
-            // }
             function showErrorMsg(error) {
                 if ('' + error === 'DOMException: Permission denied') {
                     swal({
@@ -123,7 +104,7 @@ define(["require", "exports"], function (require, exports) {
                         confirmButtonText: i18n.t('global.permissionRequiredForCameraModal.confirmText'),
                     });
                 }
-                console.log('unable access camera');
+                //console.log('unable access camera');
             }
         };
         QRReader.prototype.stop = function () {
@@ -142,7 +123,7 @@ define(["require", "exports"], function (require, exports) {
             function newDecoderFrame() {
                 if (self.ctx === null || self.webcam === null || self.canvas === null || self.decoder === null)
                     return;
-                //			console.log('new frame');
+                //			//console.log('new frame');
                 if (!self.active)
                     return;
                 try {
@@ -153,8 +134,12 @@ define(["require", "exports"], function (require, exports) {
                     }
                 }
                 catch (e) {
+                    var errorName = "";
+                    if (e instanceof Error) {
+                        errorName = e.name;
+                    }
                     // Try-Catch to circumvent Firefox Bug #879717
-                    if (e.name == "NS_ERROR_NOT_AVAILABLE")
+                    if (errorName == "NS_ERROR_NOT_AVAILABLE")
                         setTimeout(newDecoderFrame, 0);
                 }
             }

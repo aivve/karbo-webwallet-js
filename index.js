@@ -13,9 +13,12 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -218,9 +221,10 @@ define(["require", "exports", "./lib/numbersLab/Router", "./model/Mnemonic", "./
     //==================Service worker for web================
     //========================================================
     //only install the service on web platforms and not native
+    console.log("%c                                            \n .d8888b.  888                       888    \nd88P  Y88b 888                       888    \nY88b.      888                       888    This is a browser feature intended for \n \"Y888b.   888888  .d88b.  88888b.   888    developers. If someone told you to copy-paste \n    \"Y88b. 888    d88\"\"88b 888 \"88b  888    something here to enable a feature \n      \"888 888    888  888 888  888  Y8P    or \"hack\" someone's account, it is a \nY88b  d88P Y88b.  Y88..88P 888 d88P         scam and will give them access to your \n \"Y8888P\"   \"Y888  \"Y88P\"  88888P\"   888    Karbo Wallet!\n                           888              \n                           888              \n                           888              \n\nIA Self-XSS scam tricks you into compromising your wallet by claiming to provide a way to log into someone else's wallet, or some other kind of reward, after pasting a special code or link into your web browser.", "font-family:monospace");
     if (!isCordovaApp && 'serviceWorker' in navigator) {
         var showRefreshUI_1 = function (registration) {
-            console.log(registration);
+            //console.log(registration);
             swal({
                 type: 'info',
                 title: i18n.t('global.newVersionModal.title'),
@@ -261,7 +265,7 @@ define(["require", "exports", "./lib/numbersLab/Router", "./model/Mnemonic", "./
             }
             switch (event.data) {
                 case 'reload-window-update':
-                    window.location.reload(true);
+                    window.location.reload();
                     break;
                 default:
                     // NOOP
@@ -275,7 +279,7 @@ define(["require", "exports", "./lib/numbersLab/Router", "./model/Mnemonic", "./
                 // worker that will activate immediately
                 return;
             }
-            console.log('on new service worker');
+            //console.log('on new service worker');
             onNewServiceWorker_1(registration, function () {
                 showRefreshUI_1(registration);
             });

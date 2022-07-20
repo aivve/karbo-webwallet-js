@@ -12,16 +12,17 @@
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-define(["require", "exports", "../model/Constants", "../lib/numbersLab/DependencyInjector", "../model/blockchain/BlockchainExplorerRpc2"], function (require, exports, Constants_1, DependencyInjector_1, BlockchainExplorerRpc2_1) {
+define(["require", "exports", "../model/Constants", "../lib/numbersLab/DependencyInjector", "../model/blockchain/BlockchainExplorerRPCDaemon"], function (require, exports, Constants_1, DependencyInjector_1, BlockchainExplorerRPCDaemon_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BlockchainExplorerProvider = void 0;
     var BlockchainExplorerProvider = /** @class */ (function () {
         function BlockchainExplorerProvider() {
         }
         BlockchainExplorerProvider.getInstance = function () {
             var blockchainExplorer = DependencyInjector_1.DependencyInjectorInstance().getInstance(Constants_1.Constants.BLOCKCHAIN_EXPLORER);
             if (blockchainExplorer === null) {
-                blockchainExplorer = new BlockchainExplorerRpc2_1.BlockchainExplorerRpc2();
+                blockchainExplorer = new BlockchainExplorerRPCDaemon_1.BlockchainExplorerRpcDaemon();
                 DependencyInjector_1.DependencyInjectorInstance().register(Constants_1.Constants.BLOCKCHAIN_EXPLORER, blockchainExplorer);
             }
             return blockchainExplorer;

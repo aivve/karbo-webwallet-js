@@ -13,9 +13,12 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -39,10 +42,11 @@ define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLa
             var _this = _super.call(this, container) || this;
             _this.intervalRefresh = 0;
             var self = _this;
+            _this.ticker = config.coinSymbol;
             AppState_1.AppState.enableLeftMenu();
             _this.intervalRefresh = setInterval(function () {
                 self.refresh();
-            }, 1 * 1000);
+            }, 1000);
             _this.refresh();
             return _this;
         }
@@ -79,7 +83,7 @@ define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLa
         };
         AccountView.prototype.refreshWallet = function () {
             this.currentScanBlock = wallet.lastHeight;
-            this.walletAmount = wallet.amount;
+            this.walletAmount = wallet.amount();
             this.unlockedWalletAmount = wallet.unlockedAmount(this.currentScanBlock);
             if (wallet.getAll().length + wallet.txsMem.length !== this.transactions.length) {
                 this.transactions = wallet.txsMem.concat(wallet.getTransactionsCopy().reverse());
@@ -94,6 +98,9 @@ define(["require", "exports", "../lib/numbersLab/VueAnnotate", "../lib/numbersLa
         __decorate([
             VueAnnotate_1.VueVar(0)
         ], AccountView.prototype, "unlockedWalletAmount", void 0);
+        __decorate([
+            VueAnnotate_1.VueVar(0)
+        ], AccountView.prototype, "ticker", void 0);
         __decorate([
             VueAnnotate_1.VueVar(0)
         ], AccountView.prototype, "currentScanBlock", void 0);

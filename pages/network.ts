@@ -14,33 +14,37 @@
  */
 
 import {DestructableView} from "../lib/numbersLab/DestructableView";
-import {VueVar} from "../lib/numbersLab/VueAnnotate";
-import {TransactionsExplorer} from "../model/TransactionsExplorer";
-import {WalletRepository} from "../model/WalletRepository";
-import {BlockchainExplorerRpc2} from "../model/blockchain/BlockchainExplorerRpc2";
-import {DependencyInjectorInstance} from "../lib/numbersLab/DependencyInjector";
+import {VueVar, VueRequireFilter} from "../lib/numbersLab/VueAnnotate";
 import {Constants} from "../model/Constants";
 import {Wallet} from "../model/Wallet";
 import {AppState} from "../model/AppState";
+import {BlockchainExplorer, NetworkInfo} from "../model/blockchain/BlockchainExplorer";
+import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
+import {VueFilterHashrate} from "../filters/Filters";
 
 AppState.enableLeftMenu();
+let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
 
-class NetworkView extends DestructableView{
-	@VueVar(0) networkHashrate !: number;
+@VueRequireFilter('hashrate', VueFilterHashrate)
+
+class NetworkView extends DestructableView {
+	@VueVar(0) networkHashrate !: string;
 	@VueVar(0) blockchainHeight !: number;
 	@VueVar(0) networkDifficulty !: number;
 	@VueVar(0) lastReward !: number;
 	@VueVar(0) lastBlockFound !: number;
+	@VueVar(0) connectedNode !: string;
+	@VueVar(0) ticker !: string;
 
 	private intervalRefreshStat = 0;
 
-	constructor(container : string){
+	constructor(container: string) {
 		super(container);
 
 		let self = this;
-		this.intervalRefreshStat = setInterval(function(){
+		this.intervalRefreshStat = <any>setInterval(function () {
 			self.refreshStats();
-		}, 30*1000);
+		}, 30 * 1000);
 		this.refreshStats();
 	}
 
@@ -50,18 +54,17 @@ class NetworkView extends DestructableView{
 	}
 
 	refreshStats() {
-		let self = this;
-		$.ajax({
-			url:config.apiUrl+'network.php'
-		}).done(function(data : any){
-			self.networkDifficulty = data.difficulty;
-			self.networkHashrate = data.difficulty/config.avgBlockTime/1000000;
-			self.blockchainHeight = data.height;
-			self.lastReward = data.reward/Math.pow(10, config.coinUnitPlaces);
-			self.lastBlockFound = parseInt(data.timestamp);
+		blockchainExplorer.getNetworkInfo().then((info: NetworkInfo) => {
+			//console.log(info);
+			this.connectedNode = info.node;
+			this.networkDifficulty = info.difficulty;
+			this.networkHashrate = VueFilterHashrate(info.difficulty / config.avgBlockTime);
+			this.blockchainHeight = info.height;
+			this.lastReward = info.reward / Math.pow(10, config.coinUnitPlaces);
+			this.ticker = config.coinSymbol;
+			this.lastBlockFound = info.timestamp;
 		});
 	}
-
 }
 
 new NetworkView('#app');

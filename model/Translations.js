@@ -15,6 +15,7 @@
 define(["require", "exports", "./Storage"], function (require, exports, Storage_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Translations = void 0;
     var Translations = /** @class */ (function () {
         function Translations() {
         }
@@ -30,7 +31,7 @@ define(["require", "exports", "./Storage"], function (require, exports, Storage_
             Storage_1.Storage.setItem('user-lang', lang);
         };
         Translations.loadLangTranslation = function (lang) {
-            console.log('setting lang to ' + lang);
+            //console.log('setting lang to '+lang);
             var promise;
             if (typeof Translations.storedTranslations[lang] !== 'undefined')
                 promise = Promise.resolve(Translations.storedTranslations[lang]);

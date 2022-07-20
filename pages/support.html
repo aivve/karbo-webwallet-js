@@ -7,15 +7,27 @@
 			{{ $t("supportPage.subtitle") }}
 		</div>
 	</div>
-	<div class="body-content" >
+	<div class="body-content">
 		<div class="panel">
-			<div class="body" >
+			<div class="body">
 				<div class="header-title" >{{ $t("supportPage.getInTouchBlock.title") }}</div>
 				<div class="content" >
-					{{ $t("supportPage.getInTouchBlock.content") }}<br/>
-					<a href="https://discord.gg/sMCwMqs" target="_blank" rel="nofollow"><h3>{{ $t("supportPage.getInTouchBlock.discord") }}</h3></a>
+					<p>{{ $t("supportPage.getInTouchBlock.content") }}</p>
+					
+					<ul>
+						<li>E-mail: <a href="mailto:dev@karbo.io">dev@karbo.io</a></li>
+						<li>Telegram: <a href="https://t.me/karbowanec" target="_blank" rel="nofollow">https://t.me/karbowanec</a></li>
+					</ul>
+
 				</div>
 			</div>
 		</div>
+		<div class="panel">
+			<div class="body">
+				<div class="content tc">
+					<a href="#!forgotPassword" class="btn">{{ $t("global.openWalletModal.forgotPassword") }}</a>
+				</div>
+			</div>
+		</div>	
 	</div>
 </div>

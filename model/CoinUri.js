@@ -15,13 +15,15 @@
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.CoinUri = void 0;
     var CoinUri = /** @class */ (function () {
         function CoinUri() {
         }
         CoinUri.decodeTx = function (str) {
             if (str.indexOf(CoinUri.coinTxPrefix) === 0) {
-                var data = str.replace(this.coinTxPrefix, '').trim();
-                var exploded = data.split('?');
+                var data = str.replace(this.coinTxPrefix, '');
+                var temp = data.replace(/&/g, '?').trim();
+                var exploded = temp.split('?');
                 if (exploded.length == 0)
                     throw 'missing_address';
                 if (exploded[0].length !== this.coinAddressLength)
@@ -29,20 +31,29 @@ define(["require", "exports"], function (require, exports) {
                 var decodedUri = {
                     address: exploded[0]
                 };
-                for (var i = 1; i < exploded.length; ++i) {
+                for (var i = 0; i < exploded.length; ++i) {
                     var optionParts = exploded[i].split('=');
                     if (optionParts.length === 2) {
                         switch (optionParts[0].trim()) {
+                            case 'payment_id':
+                                decodedUri.paymentId = optionParts[1];
+                                break;
                             case 'tx_payment_id':
                                 decodedUri.paymentId = optionParts[1];
                                 break;
                             case 'recipient_name':
                                 decodedUri.recipientName = optionParts[1];
                                 break;
+                            case 'amount':
+                                decodedUri.amount = optionParts[1];
+                                break;
                             case 'tx_amount':
                                 decodedUri.amount = optionParts[1];
                                 break;
                             case 'tx_description':
+                                decodedUri.description = optionParts[1];
+                                break;
+                            case 'label':
                                 decodedUri.description = optionParts[1];
                                 break;
                         }
@@ -70,13 +81,13 @@ define(["require", "exports"], function (require, exports) {
             if (address.length !== this.coinAddressLength)
                 throw 'invalid_address_length';
             if (paymentId !== null)
-                encoded += '?tx_payment_id=' + paymentId;
+                encoded += '?payment_id=' + paymentId;
             if (amount !== null)
-                encoded += '?tx_amount=' + amount;
+                encoded += '?amount=' + amount;
             if (recipientName !== null)
                 encoded += '?recipient_name=' + recipientName;
             if (description !== null)
-                encoded += '?tx_description=' + description;
+                encoded += '?label=' + description;
             return encoded;
         };
         CoinUri.decodeWallet = function (str) {
