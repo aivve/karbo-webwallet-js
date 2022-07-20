@@ -123,7 +123,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
     }
 
     getHeight(): Promise<number> {
-        if (Date.now() - this.lastTimeRetrieveInfo < 20 * 1000 && this.cacheHeight !== 0) {
+        if (Date.now() - this.lastTimeRetrieveInfo < 10 * 1000 && this.cacheHeight !== 0) {
             return Promise.resolve(this.cacheHeight);
         }
 

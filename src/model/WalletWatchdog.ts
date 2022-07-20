@@ -75,11 +75,11 @@ export class WalletWatchdog {
                             self.wallet.addNew(Transaction.fromRaw(tx));
                         self.signalWalletUpdate();
                     }
-                    /*if (self.workerCurrentProcessing.length > 0) {
-                        let transactionHeight = self.workerCurrentProcessing[self.workerCurrentProcessing.length - 1].height;
-                        if (typeof transactionHeight !== 'undefined')
-                            self.wallet.lastHeight = transactionHeight;
-                    }*/
+                    //if (self.workerCurrentProcessing.length > 0) {
+                    //    let transactionHeight = self.workerCurrentProcessing[self.workerCurrentProcessing.length - 1].height;
+                    //    if (typeof transactionHeight !== 'undefined')
+                    //        self.wallet.lastHeight = transactionHeight;
+                    //}
 
                     // we are done processing now
                     self.workerProcessingWorking = false;
@@ -124,7 +124,7 @@ export class WalletWatchdog {
 
             this.intervalMempool = setInterval(function () {
                 self.checkMempool();
-            }, config.avgBlockTime / 2 * 1000);
+            }, 30 * 1000);
         }
         self.checkMempool();
     }
