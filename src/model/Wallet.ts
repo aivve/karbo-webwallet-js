@@ -290,46 +290,29 @@ export class Wallet extends Observable{
 		return news;
 	}
 
-	get amount() : number{
+	amount() : number{
 		return this.unlockedAmount(-1);
 	}
 
 	unlockedAmount(currentBlockHeight : number = -1) : number{
 		let amount = 0;
+
 		for(let transaction of this.transactions){
 			if(!transaction.isFullyChecked())
 				continue;
 
-			// if(transaction.ins.length > 0){
-			// 	amount -= transaction.fees;
-			// }
-			if(transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-				for(let out of transaction.outs){
-					amount += out.amount;
-				}
-			for(let nin of transaction.ins){
-				amount -= nin.amount;
-			}
+			if(currentBlockHeight === -1 || transaction.isConfirmed(currentBlockHeight))
+				amount += transaction.getAmount();
 		}
 
-		//console.log(this.txsMem);
-		for(let transaction of this.txsMem){
-			//console.log(transaction.paymentId);
-			// for(let out of transaction.outs){
-			// 	amount += out.amount;
-			// }
-			if(transaction.isConfirmed(currentBlockHeight) || currentBlockHeight === -1)
-				for(let nout of transaction.outs){
-					amount += nout.amount;
-					//console.log('+'+nout.amount);
-				}
+		if(currentBlockHeight === -1) {
+			for(let transaction of this.txsMem){
+				//if(!transaction.isFullyChecked())
+				//	continue;
 
-			for(let nin of transaction.ins){
-				amount -= nin.amount;
-				//console.log('-'+nin.amount);
+				amount += transaction.getAmount();
 			}
 		}
-
 
 		return amount;
 	}
