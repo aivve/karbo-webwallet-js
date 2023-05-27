@@ -55,6 +55,9 @@ export const TX_EXTRA_MYSTERIOUS_MINERGATE_TAG = 0xDE;
 export const TX_EXTRA_NONCE_PAYMENT_ID = 0x00;
 export const TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID = 0x01;
 
+export const TX_EXTRA_MESSAGE_TAG = 0x04;
+export const TX_EXTRA_TTL = 0x05;
+
 type RawOutForTx = {
 	keyImage: string,
 	amount: number,
@@ -93,14 +96,21 @@ export class TransactionsExplorer {
 			} else if (extra[0] === TX_EXTRA_TAG_ADDITIONAL_PUBKEYS) {
 				extraSize = extra[1] * 32;
 				startOffset = 2;
+			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
+				//extraSize = extra[1];
+				//startOffset = 2;
+				console.log("Found TX_EXTRA_MESSAGE_TAG");
+			} else if (extra[0] === TX_EXTRA_TTL) {
+				//extraSize = extra[1];
+				//startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
-        // this tag has to be the last in extra
+				// this tag has to be the last in extra
 				// we do nothing with it
-      }
+			}
 
 			if (extraSize === 0) {
 				if (!hasFoundPubKey) {
-					throw 'Invalid extra size' + extra[0];
+					throw 'Invalid extra size ' + extra[0];
 				}
 				break;
 			}
@@ -132,7 +142,7 @@ export class TransactionsExplorer {
 		}
 	}
 
-  static ownsTx(rawTransaction: RawDaemon_Transaction, keys: any): Boolean {
+	static ownsTx(rawTransaction: RawDaemon_Transaction, keys: any): Boolean {
 		let transaction: Transaction | null = null;
 		let tx_pub_key = '';
 
@@ -185,12 +195,12 @@ export class TransactionsExplorer {
 			let generated_tx_pubkey = CnNativeBride.derive_public_key(derivation, output_idx_in_tx, keys.pub.spend);
 
 			if (txout_k.key == generated_tx_pubkey) {
-        return true;
+				return true;
 			} 
 		}
 
-    return false;
-  }
+		return false;
+	}
 
 	static parse(rawTransaction: RawDaemon_Transaction, wallet: Wallet): Transaction | null {
 		let transaction: Transaction | null = null;
@@ -240,15 +250,31 @@ export class TransactionsExplorer {
 						paymentId += String.fromCharCode(extra.data[i]);
 					}
 					paymentId = CnUtils.bintohex(paymentId);
-					break;
+					//break;
 				} else if (extra.data[0] === TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID) {
 					encryptedPaymentId = '';
 					for (let i = 1; i < extra.data.length; ++i) {
 						encryptedPaymentId += String.fromCharCode(extra.data[i]);
 					}
 					encryptedPaymentId = CnUtils.bintohex(encryptedPaymentId);
-					break;
+					//break;
 				}
+			}
+			else if (extra.type === TX_EXTRA_MESSAGE_TAG) {
+				let rawMessage: string = '';
+				for (let i = 1; i < extra.data.length; ++i) {
+					rawMessage += String.fromCharCode(extra.data[i]);
+				}
+
+				console.log(rawMessage);
+			}
+			else if (extra.type === TX_EXTRA_TTL) {
+				let rawTTL: string = '';
+				for (let i = 1; i < extra.data.length; ++i) {
+					rawTTL += String.fromCharCode(extra.data[i]);
+				}
+
+				console.log(rawTTL);
 			}
 		}
 
