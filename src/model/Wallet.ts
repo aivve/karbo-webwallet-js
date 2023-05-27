@@ -77,8 +77,10 @@ export class Wallet extends Observable{
 	private _lastHeight : number = 0;
 
 	private transactions : Transaction[] = [];
+	private txLookupMap: Map<string, Transaction> = new Map<string, Transaction>();
 	txsMem : Transaction[] = [];
 	private modified = true;
+	private modifiedTS: Date = new Date();
 	creationHeight : number = 0;
 	txPrivateKeys : {[id: string]: string} = {};
 	coinAddressPrefix:any = config.addressPrefix;
@@ -86,6 +88,11 @@ export class Wallet extends Observable{
 	keys !: UserKeys;
 
 	private _options : WalletOptions = new WalletOptions();
+
+	signalChanged = () => {
+		this.modifiedTS = new Date();
+		this.modified = true;
+	}
 
 	exportToRaw() : RawWallet{
 		let transactions : any[] = [];
@@ -113,8 +120,11 @@ export class Wallet extends Observable{
 		logDebugMsg("Wallet.loadFromRaw");
 		let wallet = new Wallet();
 		wallet.transactions = [];
+		wallet.txLookupMap.clear();
 		for(let rawTransac of raw.transactions){
-			wallet.transactions.push(Transaction.fromRaw(rawTransac));
+			let transaction = Transaction.fromRaw(rawTransac);
+			wallet.transactions.push(transaction);
+      		wallet.txLookupMap.set(transaction.txPubKey, transaction);
 		}
 		wallet._lastHeight = raw.lastHeight;
 		if(typeof raw.encryptedKeys === 'string' && raw.encryptedKeys !== '') {
@@ -176,7 +186,7 @@ export class Wallet extends Observable{
 
 	set options(value: WalletOptions) {
 		this._options = value;
-		this.modified = true;
+		this.signalChanged();
 	}
 
 	getAll(forceReload = false) : Transaction[]{
@@ -197,10 +207,12 @@ export class Wallet extends Observable{
 		if(!exist || replace) {
 			if(!exist) {
 				this.transactions.push(transaction);
+				this.txLookupMap.set(transaction.txPubKey, transaction);
 			} else {
 				for(let tr = 0; tr < this.transactions.length; ++tr) {
 					if(this.transactions[tr].txPubKey === transaction.txPubKey) {
 						this.transactions[tr] = transaction;
+						this.txLookupMap.set(transaction.txPubKey, transaction);
 					}
 				}
 			}
@@ -216,16 +228,18 @@ export class Wallet extends Observable{
 
 			// this.saveAll();
 			this.recalculateKeyImages();
-			this.modified = true;
+			this.signalChanged();
 			this.notify();
 		}
 	}
 
 	findWithTxPubKey(pubKey : string) : Transaction|null{
-		for(let tr of this.transactions)
-			if(tr.txPubKey === pubKey)
-				return tr;
-		return null;
+		let transaction: Transaction | undefined = this.txLookupMap.get(pubKey); 
+		if (transaction !== undefined) {
+			return transaction;
+		} else {
+			return null;
+		}
 	}
 
 	findMemWithTxPubKey(pubKey : string) : Transaction|null{
@@ -243,6 +257,7 @@ export class Wallet extends Observable{
 
 	addTxPrivateKeyWithTxHash(txHash : string, txPrivKey : string) : void{
 		this.txPrivateKeys[txHash] = txPrivKey;
+		this.signalChanged();
 	}
 
 	getTransactionKeyImages(){
@@ -351,7 +366,7 @@ export class Wallet extends Observable{
 
 							out.keyImage = m_key_image.key_image;
 							out.ephemeralPub = m_key_image.ephemeral_pub;
-							this.modified = true;
+							this.signalChanged();
 						}
 					}
 				}
@@ -373,7 +388,7 @@ export class Wallet extends Observable{
 									this.transactions[iTx].ins[iIn].amount = ut.amount;
 									this.transactions[iTx].ins[iIn].keyImage = ut.keyImage;
 
-									this.modified = true;
+									this.signalChanged();
 									break;
 								}
 							}
@@ -393,4 +408,17 @@ export class Wallet extends Observable{
 		}
 	}
 
+  clearTransactions = () => {
+    this.txsMem = [];
+    this.transactions = [];
+    this.txLookupMap.clear();
+    this.recalculateKeyImages();
+    this.notify();
+  }
+
+  resetScanHeight = () => {
+    this.lastHeight = this.creationHeight;
+    this.signalChanged();
+    this.notify();
+  }
 }

@@ -88,6 +88,24 @@ class SettingsView extends DestructableView{
 		DeleteWallet.deleteWallet();
 	}
 
+	resetWallet() {
+		swal({
+			title: i18n.t('settingsPage.resetWalletModal.title'),
+			html: i18n.t('settingsPage.resetWalletModal.content'),
+			showCancelButton: true,
+			confirmButtonText: i18n.t('settingsPage.resetWalletModal.confirmText'),
+			cancelButtonText: i18n.t('settingsPage.resetWalletModal.cancelText'),
+		}).then((result:any) => {
+			if (result.value) {
+				walletWatchdog.stop();
+				wallet.clearTransactions();
+				wallet.resetScanHeight();
+				walletWatchdog.start();
+				window.location.href = '#account';
+			}
+		});
+	}
+
 	@VueWatched()	readSpeedWatch(){this.updateWalletOptions();}
 	@VueWatched()	checkMinerTxWatch(){this.updateWalletOptions();}
 	@VueWatched()	customNodeWatch(){this.updateWalletOptions();}

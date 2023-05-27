@@ -110,7 +110,15 @@
 		<div class="panel">
 			<div class="body" >
 				<div class="content tc" >
-					<button class="btn red" @click="deleteWallet()" >{{ $t("settingsPage.deleteWalletButton") }}</button>
+					<button class="btn" @click="resetWallet()" >{{ $t("settingsPage.resetWalletButton") }}</button>
+				</div>
+			</div>
+		</div>
+
+    <div class="panel">
+			<div class="body" >
+				<div class="content tc" >
+					<button class="btn" @click="deleteWallet()" >{{ $t("settingsPage.deleteWalletButton") }}</button>
 				</div>
 			</div>
 		</div>

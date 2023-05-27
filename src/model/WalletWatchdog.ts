@@ -347,4 +347,20 @@ export class WalletWatchdog {
         });
     }
 
+    start = () => {
+      // init the mempool
+      this.initMempool();
+  
+      // set the interval for checking the new transactions
+      this.intervalTransactionsProcess = setInterval(() => {
+        this.checkTransactionsInterval();
+      }, this.wallet.options.readSpeed);
+  
+      // run main loop
+      this.stopped = false;
+      this.lastBlockLoading = -1;
+      this.lastMaximumHeight = 0;
+      this.loadHistory();
+    }
+
 }
