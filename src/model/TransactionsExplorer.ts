@@ -40,6 +40,10 @@ import {MathUtil} from "./MathUtil";
 import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
 import {RawDaemon_Transaction, RawDaemon_Out} from "./blockchain/BlockchainExplorer";
 import hextobin = CnUtils.hextobin;
+import cn_fast_hash = CnUtils.cn_fast_hash;
+import { JSChaCha8 } from './ChaCha8';
+
+//import * as JSChaCha8 from module("../lib/jschacha8.js");
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
 export const TX_EXTRA_NONCE_MAX_COUNT = 255;
@@ -97,9 +101,9 @@ export class TransactionsExplorer {
 				extraSize = extra[1] * 32;
 				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
-				//extraSize = extra[1];
-				//startOffset = 2;
-				console.log("Found TX_EXTRA_MESSAGE_TAG");
+				console.log('Found TX_EXTRA_MESSAGE_TAG');
+				extraSize = extra[1];
+				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TTL) {
 				//extraSize = extra[1];
 				//startOffset = 2;
@@ -202,11 +206,39 @@ export class TransactionsExplorer {
 		return false;
 	}
 
+	static decryptMessage(index: number, rawMessage: string, txPubKey: string, recepientSecretSpendKey: string): string | any {
+		let decryptedMessage: string = '';
+
+		let derivation = null;
+		try {
+			derivation = CnNativeBride.generate_key_derivation(txPubKey, recepientSecretSpendKey);
+		} catch (e) {
+			logDebugMsg('UNABLE TO CREATE DERIVATION', e);
+			return null;
+		}
+
+		let magick1: number = 0x80;
+
+		derivation += magick1;
+
+		let hash: string = cn_fast_hash(derivation);
+
+		const cha = new JSChaCha8(Buffer.from(hash), Buffer.from(String(index)), 0);
+		let _buf: Buffer = cha.decrypt(Buffer.from(rawMessage));
+
+		decryptedMessage = _buf.toString();
+
+		console.log(decryptedMessage);
+
+		return decryptedMessage;
+	}
+
 	static parse(rawTransaction: RawDaemon_Transaction, wallet: Wallet): Transaction | null {
 		let transaction: Transaction | null = null;
 
 		let tx_pub_key = '';
 		let paymentId: string | null = null;
+		let rawMessage: string = '';
 
 		let txExtras = [];
 		try {
@@ -261,7 +293,6 @@ export class TransactionsExplorer {
 				}
 			}
 			else if (extra.type === TX_EXTRA_MESSAGE_TAG) {
-				let rawMessage: string = '';
 				for (let i = 1; i < extra.data.length; ++i) {
 					rawMessage += String.fromCharCode(extra.data[i]);
 				}
@@ -420,11 +451,17 @@ export class TransactionsExplorer {
 
 			transaction.outs = outs;
 			transaction.ins = ins;
+
+			if (rawMessage !== '') {
+				// decode message
+				let message: string = '';
+				message = this.decryptMessage(0, rawMessage, tx_pub_key, wallet.keys.priv.spend);
+				transaction.message = message;
+			}
 		}
 
 		return transaction;
 	}
-
 
 	static formatWalletOutsForTx(wallet: Wallet, blockchainHeight: number): RawOutForTx[] {
 		let unspentOuts = [];
