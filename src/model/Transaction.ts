@@ -158,6 +158,7 @@ export class Transaction {
         }
         if (this.paymentId !== '') data.paymentId = this.paymentId;
         if (this.fees !== 0) data.fees = this.fees;
+        if (this.message !== '') data.message = this.message;
         return data;
     }
 

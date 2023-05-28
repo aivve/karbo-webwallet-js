@@ -218,10 +218,15 @@ export class TransactionsExplorer {
 		}
 
 		let magick1: number = 0x80;
+		let magick2: number = 0;
 
-		derivation += magick1;
-
-		let hash: string = cn_fast_hash(derivation);
+		let key_data: string = derivation + magick1 + magick2;
+		let hash: string = '';
+		try {
+			hash = cn_fast_hash(key_data);
+		} catch (e) {
+			console.error('cn_fast_hash error ' + e);
+		}
 
 		const cha = new JSChaCha8(Buffer.from(hash), Buffer.from(String(index)), 0);
 		let _buf: Buffer = cha.decrypt(Buffer.from(rawMessage));
