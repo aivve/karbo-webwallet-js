@@ -1,6 +1,8 @@
 
 "use strict";
 
+//const { Uint8Array } = require("node:Uint8Array");
+
 declare let Module : any;
 
 export class JSChaCha8 {
@@ -12,30 +14,30 @@ export class JSChaCha8 {
 
 /**
  *
- * @param {Buffer} bufKey
- * @param {Buffer} bufNonce
+ * @param {Uint8Array} bufKey
+ * @param {Uint8Array} bufNonce
  * @param {number} counter
  * @throws {Error}
  *
  * @constructor
  */
-constructor(bufKey: Buffer, bufNonce: Buffer, counter: number) {
+constructor(bufKey: Uint8Array, bufNonce: Uint8Array, counter: number) {
   if (typeof counter === "undefined") {
     counter = 0;
   }
 
   if (!(bufKey instanceof Uint8Array) || bufKey.length !== 32) {
-    throw new Error("Key should be 32 byte buffer!");
+    throw new Error("Key should be 32 byte Uint8Array!");
   }
 
   if (!(bufNonce instanceof Uint8Array) || bufNonce.length !== 12) {
-    throw new Error("Nonce should be 12 byte buffer!");
+    throw new Error("Nonce should be 12 byte Uint8Array!");
   }
 
   const key = new Uint8Array(bufKey);
   const nonce = new Uint8Array(bufNonce);
 
-  this._rounds = 8;
+  this._rounds = 10;
   // Constants
   this._sigma = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]; // expand 32-byte k
 
@@ -163,21 +165,21 @@ _rotl(data: number, shift: number): number {
 /**
  *  Encrypt data with key and nonce
  *
- * @param {Buffer} data
- * @return {Buffer}
+ * @param {Uint8Array} data
+ * @return {Uint8Array}
  */
-encrypt(data: Buffer): Buffer {
-  return Buffer.from(this._update(new Uint8Array(data)));
+encrypt(data: Uint8Array): Uint8Array {
+  return this._update(new Uint8Array(data));
 };
 
 /**
  *  Decrypt data with key and nonce
  *
- * @param {Buffer} data
- * @return {Buffer}
+ * @param {Uint8Array} data
+ * @return {Uint8Array}
  */
-decrypt(data: Buffer): Buffer {
-  return Buffer.from(this._update(new Uint8Array(data)));
+decrypt(data: Uint8Array): Uint8Array {
+  return this._update(new Uint8Array(data));
 };
 
 /**

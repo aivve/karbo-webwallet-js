@@ -41,9 +41,10 @@ import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
 import {RawDaemon_Transaction, RawDaemon_Out} from "./blockchain/BlockchainExplorer";
 import hextobin = CnUtils.hextobin;
 import cn_fast_hash = CnUtils.cn_fast_hash;
-import { JSChaCha8 } from './ChaCha8';
+import {JSChaCha8} from './ChaCha8';
 
-//import * as JSChaCha8 from module("../lib/jschacha8.js");
+//(window as any).global = window;
+//(window as any).global.Buffer = require('buffer').Buffer;
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
 export const TX_EXTRA_NONCE_MAX_COUNT = 255;
@@ -227,13 +228,45 @@ export class TransactionsExplorer {
 		} catch (e) {
 			console.error('cn_fast_hash error ' + e);
 		}
+		
+		try {
 
-		const cha = new JSChaCha8(Buffer.from(hash), Buffer.from(String(index)), 0);
-		let _buf: Buffer = cha.decrypt(Buffer.from(rawMessage));
+			let result = [];
+			let hexString = hash;
+			while (hexString.length >= 2) { 
+				result.push(parseInt(hexString.substring(0, 2), 16));
+				hexString = hexString.substring(2, hexString.length);
+			}
 
-		decryptedMessage = _buf.toString();
+			let hashBuf: Uint8Array = new Uint8Array(result);
 
-		console.log(decryptedMessage);
+			//console.log(hash);
+			//console.log(hashBuf);
+
+			let nonceBuf = new Uint8Array(12);
+
+			for (let i = 0; i < 12; i++) {
+				nonceBuf[i] = index % 256;
+				index = Math.floor(index / 256);
+			}
+
+		const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
+
+		let _buf = cha.decrypt(new TextEncoder().encode(rawMessage));
+
+		//for (let i = 0; i < _buf.length; ++i) {
+		//	decryptedMessage += String.fromCharCode(_buf[i]);
+		//}
+
+		decryptedMessage = new TextDecoder().decode(_buf);
+		
+
+		} catch (e) {
+			console.error('JSChaCha8 error ' + e);
+		}
+
+		console.log("Decrypted Message: " + decryptedMessage);
+
 
 		return decryptedMessage;
 	}
@@ -459,9 +492,12 @@ export class TransactionsExplorer {
 
 			if (rawMessage !== '') {
 				// decode message
-				let message: string = '';
-				message = this.decryptMessage(0, rawMessage, tx_pub_key, wallet.keys.priv.spend);
-				transaction.message = message;
+				//try {
+				let message: string = this.decryptMessage(0, rawMessage, tx_pub_key, wallet.keys.priv.spend);
+				//transaction.message = message;
+				//} catch (e) {
+				//	console.log('ERROR IN DECRYPTING MESSAGE: ', e);
+				//}
 			}
 		}
 
