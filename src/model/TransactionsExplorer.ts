@@ -249,7 +249,7 @@ export class TransactionsExplorer {
 			console.log(nonceBuf.length);
 
 			// typescripted chacha
-			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
+			const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
 			let _buf = cha.decrypt(new TextEncoder().encode(rawMessage));
 
 			let decryptedMessage2: string = '';

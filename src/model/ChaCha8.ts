@@ -21,9 +21,12 @@ export class JSChaCha8 {
  *
  * @constructor
  */
-constructor(bufKey: Uint8Array, bufNonce: Uint8Array, counter: number) {
+constructor(bufKey: Uint8Array, bufNonce: Uint8Array, counter: number, doubleRounds: number) {
   if (typeof counter === "undefined") {
     counter = 0;
+  }
+  if (typeof doubleRounds === "undefined") {
+    doubleRounds = 8;
   }
 
   if (!(bufKey instanceof Uint8Array) || bufKey.length !== 32) {
@@ -40,7 +43,7 @@ constructor(bufKey: Uint8Array, bufNonce: Uint8Array, counter: number) {
   const key = bufKey;
   const nonce = bufNonce;
 
-  this._rounds = 8;
+  this._rounds = doubleRounds; //8
   // Constants
   this._sigma = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]; // expand 32-byte k
 
