@@ -248,23 +248,9 @@ export class TransactionsExplorer {
 			console.log(nonceBuf);
 			console.log(nonceBuf.length);
 
-			let decr_buf = CnUtils.chacha8_decrypt(hashBuf, nonceBuf, new TextEncoder().encode(rawMessage));
-
-			console.log(decr_buf);
-
-			let decryptedMessage1: string = '';
-
-			decryptedMessage1 = new TextDecoder().decode(decr_buf);
-			console.log("Decrypted Message: " + decryptedMessage1);
-			for (let i = 1; i < decr_buf.length; ++i) {
-				decryptedMessage += String.fromCharCode(decr_buf[i]);
-			}
-			console.log("Decrypted Message: " + decryptedMessage);
-
 			// typescripted chacha
-			const cha = new JSChaCha8(hashBuf, nonceBuf, 10);
+			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
 			let _buf = cha.decrypt(new TextEncoder().encode(rawMessage));
-
 
 			let decryptedMessage2: string = '';
 

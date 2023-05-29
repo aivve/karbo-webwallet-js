@@ -331,14 +331,6 @@ export namespace CnUtils{
 		return keccak_256(CnUtils.hextobin(input));
 	}
 
-  export function chacha8_ecnrypt(key: Uint8Array, nonce: Uint8Array, message: Uint8Array): Uint8Array {
-    return new (<any>window).JSChaCha8(key, nonce, 10).encrypt(message);   
-  }
-
-  export function chacha8_decrypt(key: Uint8Array, nonce: Uint8Array, message: Uint8Array): Uint8Array {
-    return new (<any>window).JSChaCha8(key, nonce, 10).decrypt(message);   
-  }
-
   export function hex_xor(hex1 : string, hex2 : string) {
 		if (!hex1 || !hex2 || hex1.length !== hex2.length || hex1.length % 2 !== 0 || hex2.length % 2 !== 0){throw "Hex string(s) is/are invalid!";}
 		let bin1 = hextobin(hex1);
