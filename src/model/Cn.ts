@@ -331,20 +331,12 @@ export namespace CnUtils{
 		return keccak_256(CnUtils.hextobin(input));
 	}
 
-  export function chacha8_ecnrypt(key: any, nonce: any, message: any): any {
-    return new (<any>window).JSChaCha8(key, nonce).encrypt(message);   
+  export function chacha8_ecnrypt(key: Uint8Array, nonce: Uint8Array, message: Uint8Array): Uint8Array {
+    return new (<any>window).JSChaCha8(key, nonce, 10).encrypt(message);   
   }
 
-  export function chacha8_decrypt(key: any, nonce: any, message: any): any {
-    return new (<any>window).JSChaCha8(key, nonce).decrypt(message);   
-  }
-
-  export function buffer_alloc(size: number, fill?: any, encoding?: string): any {
-    return new (<any>window).Buffer().alloc(size, fill, encoding);   
-  }
-
-  export function buffer_write(data: string, offset?: number, length?: number, encoding?: string): any {
-    return new (<any>window).Buffer().write(data, offset, length, encoding);   
+  export function chacha8_decrypt(key: Uint8Array, nonce: Uint8Array, message: Uint8Array): Uint8Array {
+    return new (<any>window).JSChaCha8(key, nonce, 10).decrypt(message);   
   }
 
   export function hex_xor(hex1 : string, hex2 : string) {

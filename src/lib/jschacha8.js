@@ -1,16 +1,13 @@
 'use strict'
 /**
  *
- * @param {Buffer} bufKey
- * @param {Buffer} bufNonce
+ * @param {Uint8Array} bufKey
+ * @param {Uint8Array} bufNonce
  * @param {number} counter
  * @throws {Error}
  *
  * @constructor
  */
- function getBuffer(size) {
-  return Buffer.alloc(size);
- }
  
 const JSChaCha8 = function (bufKey, bufNonce, counter) {
   if (typeof counter === 'undefined') {
@@ -25,8 +22,8 @@ const JSChaCha8 = function (bufKey, bufNonce, counter) {
     throw new Error('Nonce should be 12 byte buffer!')
   }
 
-  const key = new Uint8Array(bufKey)
-  const nonce = new Uint8Array(bufNonce)
+  const key = bufKey//new Uint8Array(bufKey)
+  const nonce = bufNonce//new Uint8Array(bufNonce)
 
   this._rounds = 8
   // Constants
@@ -152,21 +149,23 @@ JSChaCha8.prototype._rotl = function (data, shift) {
 /**
  *  Encrypt data with key and nonce
  *
- * @param {Buffer} data
- * @return {Buffer}
+ * @param {Uint8Array} data
+ * @return {Uint8Array}
  */
 JSChaCha8.prototype.encrypt = function (data) {
-  return Buffer.from(this._update(new Uint8Array(data)))
+  //return Buffer.from(this._update(new Uint8Array(data)))
+  return this._update(new Uint8Array(data))
 }
 
 /**
  *  Decrypt data with key and nonce
  *
- * @param {Buffer} data
- * @return {Buffer}
+ * @param {Uint8Array} data
+ * @return {Uint8Array}
  */
 JSChaCha8.prototype.decrypt = function (data) {
-  return Buffer.from(this._update(new Uint8Array(data)))
+  //return Buffer.from(this._update(new Uint8Array(data)))
+  return this._update(new Uint8Array(data))
 }
 
 /**

@@ -39,12 +39,7 @@ import {Wallet} from "./Wallet";
 import {MathUtil} from "./MathUtil";
 import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
 import {RawDaemon_Transaction, RawDaemon_Out} from "./blockchain/BlockchainExplorer";
-import hextobin = CnUtils.hextobin;
-import cn_fast_hash = CnUtils.cn_fast_hash;
 import {JSChaCha8} from './ChaCha8';
-
-//(window as any).global = window;
-//(window as any).global.Buffer = require('buffer').Buffer;
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
 export const TX_EXTRA_NONCE_MAX_COUNT = 255;
@@ -154,7 +149,7 @@ export class TransactionsExplorer {
 		let txExtras = [];
 		try {
 			let hexExtra: number[] = [];
-			let uint8Array = hextobin(rawTransaction.extra);
+			let uint8Array = CnUtils.hextobin(rawTransaction.extra);
 
 			for (let i = 0; i < uint8Array.byteLength; i++) {
 				hexExtra[i] =  uint8Array[i];
@@ -224,13 +219,12 @@ export class TransactionsExplorer {
 		let key_data: string = derivation + magick1 + magick2;
 		let hash: string = '';
 		try {
-			hash = cn_fast_hash(key_data);
+			hash = CnUtils.cn_fast_hash(key_data);
 		} catch (e) {
 			console.error('cn_fast_hash error ' + e);
 		}
 		
 		try {
-
 			let result = [];
 			let hexString = hash;
 			while (hexString.length >= 2) { 
@@ -238,10 +232,11 @@ export class TransactionsExplorer {
 				hexString = hexString.substring(2, hexString.length);
 			}
 
-			let hashBuf: Uint8Array = new Uint8Array(result);
+			console.log(result);
+			console.log(result.length);
 
-			//console.log(hash);
-			//console.log(hashBuf);
+			let hashBuf: Uint8Array = new Uint8Array(result);
+			console.log(hashBuf);
 
 			let nonceBuf = new Uint8Array(12);
 
@@ -250,22 +245,45 @@ export class TransactionsExplorer {
 				index = Math.floor(index / 256);
 			}
 
-		const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
+			console.log(nonceBuf);
+			console.log(nonceBuf.length);
 
-		let _buf = cha.decrypt(new TextEncoder().encode(rawMessage));
+			let decr_buf = CnUtils.chacha8_decrypt(hashBuf, nonceBuf, new TextEncoder().encode(rawMessage));
 
-		//for (let i = 0; i < _buf.length; ++i) {
-		//	decryptedMessage += String.fromCharCode(_buf[i]);
-		//}
+			console.log(decr_buf);
 
-		decryptedMessage = new TextDecoder().decode(_buf);
-		
+			let decryptedMessage1: string = '';
+
+			decryptedMessage1 = new TextDecoder().decode(decr_buf);
+			console.log("Decrypted Message: " + decryptedMessage1);
+			for (let i = 1; i < decr_buf.length; ++i) {
+				decryptedMessage += String.fromCharCode(decr_buf[i]);
+			}
+			console.log("Decrypted Message: " + decryptedMessage);
+
+			// typescripted chacha
+			const cha = new JSChaCha8(hashBuf, nonceBuf, 10);
+			let _buf = cha.decrypt(new TextEncoder().encode(rawMessage));
+
+
+			let decryptedMessage2: string = '';
+
+			let decryptedMessage3: string = '';
+			
+			decryptedMessage2 = new TextDecoder().decode(_buf);
+			console.log("Decrypted Message: " + decryptedMessage2);
+
+			for (let i = 1; i < _buf.length; ++i) {
+				decryptedMessage3 += String.fromCharCode(_buf[i]);
+			}
+			console.log("Decrypted Message: " + decryptedMessage3);
+
 
 		} catch (e) {
 			console.error('JSChaCha8 error ' + e);
 		}
 
-		console.log("Decrypted Message: " + decryptedMessage);
+		//console.log("Decrypted Message: " + decryptedMessage);
 
 
 		return decryptedMessage;
@@ -281,7 +299,7 @@ export class TransactionsExplorer {
 		let txExtras = [];
 		try {
 			let hexExtra: number[] = [];
-			let uint8Array = hextobin(rawTransaction.extra);
+			let uint8Array = CnUtils.hextobin(rawTransaction.extra);
 
 			for (let i = 0; i < uint8Array.byteLength; i++) {
 				hexExtra[i] =  uint8Array[i];

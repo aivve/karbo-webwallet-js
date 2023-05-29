@@ -34,10 +34,13 @@ constructor(bufKey: Uint8Array, bufNonce: Uint8Array, counter: number) {
     throw new Error("Nonce should be 12 byte Uint8Array!");
   }
 
-  const key = new Uint8Array(bufKey);
-  const nonce = new Uint8Array(bufNonce);
+  //const key = new Uint8Array(bufKey);
+  //const nonce = new Uint8Array(bufNonce);
 
-  this._rounds = 10;
+  const key = bufKey;
+  const nonce = bufNonce;
+
+  this._rounds = 8;
   // Constants
   this._sigma = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]; // expand 32-byte k
 
@@ -169,7 +172,7 @@ _rotl(data: number, shift: number): number {
  * @return {Uint8Array}
  */
 encrypt(data: Uint8Array): Uint8Array {
-  return this._update(new Uint8Array(data));
+  return this._update(data);
 };
 
 /**
@@ -179,7 +182,7 @@ encrypt(data: Uint8Array): Uint8Array {
  * @return {Uint8Array}
  */
 decrypt(data: Uint8Array): Uint8Array {
-  return this._update(new Uint8Array(data));
+  return this._update(data);
 };
 
 /**
