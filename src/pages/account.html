@@ -53,7 +53,12 @@
 
 		<div class="panel nopadding">
 			<div class="body" >
-				<div class="header-title" >{{ $t("accountPage.historyBlock.title") }} ({{ $n(transactions.length) }} / {{ $n(allTransactionsCount) }})</div>
+        <div class="header-wrapper">
+				  <div class="header-title" >{{ $t("accountPage.historyBlock.title") }} ({{ $n(transactions.length) }} / {{ $n(allTransactionsCount) }})</div>
+          <div class="header-filer-wrapper field">
+            <input class="header-filer" type="text" v-model="txFilter" />
+          </div>
+        </div>
 				<div class="content" >
 					<div class="transactions" id="accountTransactions">
 						<table>
@@ -74,7 +79,7 @@
 									<td colspan="4" class="paymentId" >{{transaction.paymentId}}</td><!--UNDER-->
 								</tr>
 							</template>
-							<tr v-if="transactions.length == 0" >
+							<tr v-if="transactions.length == 0">
 								<td colspan="4" class="noTransactions">
 									{{ $t("accountPage.historyBlock.emptyWallet") }}<br/>
 									<span v-if="currentScanBlock+1 !== blockchainHeight" >
@@ -90,7 +95,7 @@
 							</tr>
 						</table>
 					</div>
-          <div class="txLoadMore">
+          <div class="txLoadMore" v-if="allTransactionsCount > transactions.length">
             <button type="button" class="btn primary" @click="increasePageCount()" :disabled="optimizeLoading || isWalletProcessing || (transactions.length >= allTransactionsCount)">
               {{ $t("accountPage.historyBlock.loadMoreBtn") }}...
             </button>

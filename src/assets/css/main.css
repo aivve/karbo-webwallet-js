@@ -395,6 +395,7 @@ body.transparent #copyright {
 
 .transactions td.noTransactions {
 	text-align: center;
+  padding-top: 3em;
 }
 
 .transactions .transaction div {
@@ -1537,4 +1538,50 @@ body {
   width: 100%;
   text-align: center;
   padding: 1em;
+}
+
+.remoteNodesContainer {
+  border-bottom: 1px solid;
+  margin-bottom: 1em;
+  max-height: 400px;
+  overflow-y: auto;  
+}
+
+.remoteNodes {
+  padding-left: 1.5em;
+}
+
+.contentTitle {
+  font-weight: bold;
+  text-decoration: underline;
+  font-size: 1.1em;
+  margin-bottom: 1em;
+  color: orange; 
+}
+
+.header-wrapper {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+}
+
+.header-filer-wrapper {
+  flex-grow: 1;
+  text-align: right;
+  padding-right: 1em;
+  line-height: 1.4;
+  margin-bottom: -10px !important;
+}
+
+@media only screen and (max-width: 600px) {
+  .header-wrapper {
+    flex-direction: column;
+  }
+  
+  .header-filer-wrapper {
+    width: 100%;
+    padding-left: 2em;
+    padding-right: 2em;
+    margin-bottom: 1em !important;
+  }
 }

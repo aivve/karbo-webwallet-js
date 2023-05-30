@@ -32,6 +32,7 @@ let walletWatchdog : WalletWatchdog = DependencyInjectorInstance().getInstance(W
 
 class AccountView extends DestructableView{
 	@VueVar([]) transactions !: Transaction[];
+  @VueVar('') txFilter !: string;
 	@VueVar(0) lastBlockLoading !: number;
 	@VueVar(0) processingQueue !: number;
 	@VueVar(0) processingTxNum !: number;
@@ -52,9 +53,11 @@ class AccountView extends DestructableView{
 	@VueVar(false) isWalletSyncing !: boolean;
 	@VueVar(0) optimizeOutputs !: number;
 
-	intervalRefresh : NodeJS.Timer;
-  refreshTimestamp: Date;
-  lastPending: number;
+  readonly refreshInterval = 500;
+	private intervalRefresh : NodeJS.Timer;
+  private refreshTimestamp: Date;
+  private oldTxFilter: string;
+  private lastPending: number;
 
 	constructor(container : string) {
 		super(container);
@@ -64,6 +67,9 @@ class AccountView extends DestructableView{
     this.lastPending = 0;
     this.pagesCount = 1;
     this.txPerPage = 200;
+    this.oldTxFilter = '';
+    this.txFilter = '';
+
   	this.checkOptimization();
 		AppState.enableLeftMenu();
 
@@ -87,11 +93,13 @@ class AccountView extends DestructableView{
 		this.refreshWallet();
 	}
 
+  onFilterChanged = () => {
+    this.refreshWallet();		
+  }
+
 	checkOptimization = () => {
     blockchainExplorer.getHeight().then((blockchainHeight: number) => {
       let optimizeInfo = wallet.optimizationNeeded(blockchainHeight, config.optimizeThreshold);
-      logDebugMsg("optimizeInfo.numOutputs", optimizeInfo.numOutputs);
-      logDebugMsg('optimizeInfo.isNeeded', optimizeInfo.isNeeded);
       this.optimizeIsNeeded = optimizeInfo.isNeeded;
       if(optimizeInfo.isNeeded) {
         this.optimizeOutputs = optimizeInfo.numOutputs;
@@ -108,7 +116,6 @@ class AccountView extends DestructableView{
           return blockchainExplorer.getRandomOuts(amounts, numberOuts);
         }).then((processedOuts: number) => {
           let watchdog: WalletWatchdog = DependencyInjectorInstance().getInstance(WalletWatchdog.name);
-          logDebugMsg("processedOuts", processedOuts);
           //force a mempool check so the user is up to date
           if (watchdog !== null) {
             watchdog.checkMempool();
@@ -163,13 +170,13 @@ class AccountView extends DestructableView{
 	}
 
 	refreshWallet = (forceRedraw: boolean = false) => {
+    let filterChanged = false;
     let oldIsWalletSyncing = this.isWalletSyncing;
     let timeDiff: number = new Date().getTime() - this.refreshTimestamp.getTime();
     this.processingTxNum = walletWatchdog.getBlockList().getTxQueue().getSize();
     this.processingQueue = walletWatchdog.getBlockList().getSize();
     this.lastBlockLoading = walletWatchdog.getLastBlockLoading();
     this.currentScanBlock = wallet.lastHeight;
-
     this.isWalletSyncing = (wallet.lastHeight + 2) < this.blockchainHeight;
     this.isWalletProcessing = this.isWalletSyncing || (walletWatchdog.getBlockList().getTxQueue().getSize() > 0);
     
@@ -177,15 +184,30 @@ class AccountView extends DestructableView{
       this.checkOptimization();
     }
 
-    if ((((this.refreshTimestamp < wallet.modifiedTimestamp()) || (this.lastPending > 0)) && (timeDiff > 500)) || forceRedraw) {
-      logDebugMsg("refreshWallet", this.currentScanBlock);
+    if (this.oldTxFilter !== this.txFilter) {
+      timeDiff = 2 * this.refreshInterval;
+      this.oldTxFilter = this.txFilter;
+      filterChanged = true;
+    }
+
+    if ((((this.refreshTimestamp < wallet.modifiedTimestamp()) || (this.lastPending > 0)) && (timeDiff > this.refreshInterval)) || forceRedraw || filterChanged) {
+      logDebugMsg("refreshWallet", this.currentScanBlock);      
 
       this.walletAmount = wallet.amount;
       this.unlockedWalletAmount = wallet.unlockedAmount(this.currentScanBlock);
       this.lastPending = this.walletAmount - this.unlockedWalletAmount;
 
-      if ((this.refreshTimestamp < wallet.modifiedTimestamp()) || forceRedraw) {
+      if ((this.refreshTimestamp < wallet.modifiedTimestamp()) || forceRedraw || filterChanged) {
         let allTransactions = wallet.txsMem.concat(wallet.getTransactionsCopy().reverse());
+
+        if (this.txFilter) {
+          allTransactions = allTransactions.filter(tx => {
+            return (tx.hash.toUpperCase().includes(this.txFilter.toUpperCase()) ||
+                    tx.paymentId.toUpperCase().includes(this.txFilter.toUpperCase()) ||
+                    tx.getAmount().toString().toUpperCase().includes(this.txFilter.toUpperCase()));
+          });
+        }
+
         this.transactions = allTransactions.slice(0, this.pagesCount * this.txPerPage);
         this.allTransactionsCount = allTransactions.length;
 

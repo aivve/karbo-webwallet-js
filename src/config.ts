@@ -3,16 +3,15 @@ let myGlobal : any = typeof window !== 'undefined' ? window : self;
 myGlobal.config = {
   debug: false,
 	apiUrl: [
-        "https://ccxapi.conceal.network/api/"
-    ],
-    nodeList: [
-        "https://seed1.conceal.network/daemon/",
-        "https://seed2.conceal.network/daemon/",
-        "https://seed3.conceal.network/daemon/",
-        "https://ccxapi.conceal.network/daemon/",
-        "https://explorer.conceal.network/daemon/"
-    ],
-	nodeUrl: "",
+    "https://ccxapi.conceal.network/api/"
+  ],
+  nodeList: [
+    "https://seed1.conceal.network/daemon/",
+    "https://seed2.conceal.network/daemon/",
+    "https://seed3.conceal.network/daemon/",
+    "https://ccxapi.conceal.network/daemon/",
+    "https://explorer.conceal.network/daemon/"
+  ],
 	mainnetExplorerUrl: "https://explorer.conceal.network/",
 	mainnetExplorerUrlHash: "https://explorer.conceal.network/index.html?hash={ID}#blockchain_transaction",
 	mainnetExplorerUrlBlock: "https://explorer.conceal.network/index.html?hash={ID}#blockchain_block",
@@ -43,7 +42,7 @@ myGlobal.config = {
 
 	idleTimeout: 30,
 	idleWarningDuration: 20,
-	syncBlockCount: 500, // how many block we sync at once for a single remote node
+	syncBlockCount: 250, // how many block we sync at once for a single remote node
   maxRemoteNodes: 8, // what is the max remote nodes we use in a sync process
   maxWorkerCores: 8, // max cores that the workers can use. If lower they will use numberOfCores - 1
 
@@ -55,9 +54,6 @@ myGlobal.config = {
 	avgBlockTime: 120,
 	maxBlockNumber: 500000000,
 };
-let randInt = Math.floor(Math.random() * Math.floor(config.nodeList.length));
-config.nodeUrl = config.nodeList[randInt];
-
 
 function logDebugMsg(...data: any[]) {
   if (config.debug) {
