@@ -204,10 +204,10 @@ export class TransactionsExplorer {
 
 
 
-	static decryptMessage(index: number, rawMessage: Uint8Array, txPubKey: string, recepientSecretSpendKey: string): string | any {
+	static decryptMessage(index: number, txPubKey: string, recepientSecretSpendKey: string, rawMessage: Uint8Array): string | any {
 		let decryptedMessage: string = '';
 
-		let derivation = null;
+		let derivation: string;
 		try {
 			derivation = CnNativeBride.generate_key_derivation(txPubKey, recepientSecretSpendKey);
 		} catch (e) {
@@ -215,12 +215,20 @@ export class TransactionsExplorer {
 			return null;
 		}
 
-		let magick1 = CnUtils.encode_varint(0x80);
+		let derivationBin = CnUtils.hextobin(derivation);
+		let magick1 = CnUtils.hextobin("0x80");
 		let magick2 = CnUtils.encode_varint(0);
 
-		let key_data: string = derivation + magick1 /*+ magick2*/; // length (bin) should be 34
+		let len = derivationBin.length - 1;
+		let keyDataAr = new Uint8Array(len + magick1.length);
+		for (let i = 0; i < len; i++) { keyDataAr[i] = derivationBin[i];}
+		for (let i = 0; i < magick1.length; i++) { keyDataAr[len + i] = magick1[i];}
 
-		let hash: string = CnUtils.cn_fast_hash(key_data);
+		// length (bin) should be 34
+
+		let keyData: string = CnUtils.bintohex(keyDataAr);
+
+		let hash: string = CnUtils.cn_fast_hash(keyData);
 
 		try {
 			let hashBuf: Uint8Array = CnUtils.hextobin(hash);
@@ -234,11 +242,10 @@ export class TransactionsExplorer {
 			// typescripted chacha
 			const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
 			let _buf = cha.decrypt(rawMessage);
-		
-			decryptedMessage = new TextDecoder().decode(_buf);
-			
-			console.log("Decrypted Message: " + decryptedMessage);
 
+			decryptedMessage = new TextDecoder("utf-8").decode(_buf);
+
+			console.log("Decrypted Message: " + decryptedMessage);
 		} catch (e) {
 			console.error('JSChaCha8 error ' + e);
 		}
@@ -306,15 +313,7 @@ export class TransactionsExplorer {
 				}
 			}
 			else if (extra.type === TX_EXTRA_MESSAGE_TAG) {
-				console.log(extra.data);
-	
-				//for (let i = 1; i < extra.data.length; ++i) {
-				//	rawMessage += String.fromCharCode(extra.data[i]);
-				//}
-				//rawMessage = CnUtils.bintohex(extra.data);
-
 				rawMessage = Uint8Array.from(extra.data);
-
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
@@ -471,12 +470,12 @@ export class TransactionsExplorer {
 
 			if (rawMessage.length !== 0) {
 				// decode message
-				//try {
-				let message: string = this.decryptMessage(0, rawMessage, tx_pub_key, wallet.keys.priv.spend);
-				//transaction.message = message;
-				//} catch (e) {
-				//	console.log('ERROR IN DECRYPTING MESSAGE: ', e);
-				//}
+				try {
+					let message: string = this.decryptMessage(0, tx_pub_key, wallet.keys.priv.spend, rawMessage);
+					transaction.message = message;
+				} catch (e) {
+					console.log('ERROR IN DECRYPTING MESSAGE: ', e);
+				}
 			}
 		}
 
