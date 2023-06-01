@@ -208,6 +208,10 @@ export class TransactionsExplorer {
 
 	static decryptMessage(index: number, txPubKey: string, recepientSecretSpendKey: string, rawMessage: string): string | any {
 		let decryptedMessage: string = '';
+		let mlen: number = rawMessage.length;
+
+		if (mlen < TX_EXTRA_MESSAGE_CHECKSUM_SIZE)
+			return null;
 
 		let derivation: string;
 		try {
@@ -217,18 +221,13 @@ export class TransactionsExplorer {
 			return null;
 		}
 
-		console.log("derivation: " + derivation); 
-
-		let magick1 = 0x80; //CnUtils.encode_varint(0x80);
+		let magick1 = CnUtils.encode_varint(0x80);
         let magick2 = CnUtils.encode_varint(0);
 
         let keyData: string = derivation + magick1 /*+ magick2*/;
 
-		console.log("keyData: " + keyData);
-
 		// length (bin) should be 34
-
-		//let keyData: string = CnUtils.bintohex(keyDataAr);
+		console.log("keyData length: " + keyData.length / 2);
 
 		let hash: string = CnUtils.cn_fast_hash(keyData);
 
@@ -236,24 +235,40 @@ export class TransactionsExplorer {
 		
 		console.log("Extra mess index: " + index);
 
-		let nonceBuf = new Uint8Array(12);
+		/*let nonceBuf = new Uint8Array(12);
+		let _index = index;
 		for (let i = 0; i < 12; i++) {
-			nonceBuf[i] = index % 256;
-			index = Math.floor(index / 256);
+			nonceBuf[i] = _index % 256;
+			_index = Math.floor(index / 256);
 		}
+		console.log(nonceBuf);*/
+
+		let nonceBuf = new Uint8Array(12);
+		for(let i = 0; i < 12; i++)
+			nonceBuf.set([index/0x100**i], 11-i);
+		//console.log(nonceBuf);
 
 		let rawMessArr = CnUtils.hextobin(rawMessage);
 
-		try {
-			// typescripted chacha
-			const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
-			let _buf = cha.decrypt(rawMessArr);
-			decryptedMessage = new TextDecoder("utf-8").decode(_buf);
-		} catch (e) {
-			console.error('JSChaCha8 error ' + e);
-		}
+		// typescripted chacha
+		const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
+		let _buf = cha.decrypt(rawMessArr);
+		decryptedMessage = new TextDecoder().decode(_buf);
 
 		console.log("Decrypted Message: " + decryptedMessage);
+
+		let decryptedMessage1: string = '';
+		for (let i = 1; i < _buf.length; ++i) {
+			decryptedMessage1 += String.fromCharCode(_buf[i]);
+		}
+		console.log("Decrypted Message: " + decryptedMessage1);
+
+		mlen -= TX_EXTRA_MESSAGE_CHECKSUM_SIZE;
+		for (let i = 0; i < TX_EXTRA_MESSAGE_CHECKSUM_SIZE; i++) {
+			if (_buf[mlen + i] != 0) {
+				return null;
+			}
+		}
 
 		return decryptedMessage;
 	}
@@ -322,6 +337,9 @@ export class TransactionsExplorer {
 				for (let i = 1; i < extra.data.length; ++i) {
                     rawMessage += String.fromCharCode(extra.data[i]);
                 }
+				rawMessage = CnUtils.bintohex(rawMessage);
+
+				console.log("Encrypted Message: " + rawMessage);
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
