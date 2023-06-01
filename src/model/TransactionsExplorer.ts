@@ -58,6 +58,8 @@ export const TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID = 0x01;
 export const TX_EXTRA_MESSAGE_TAG = 0x04;
 export const TX_EXTRA_TTL = 0x05;
 
+export const TX_EXTRA_MESSAGE_CHECKSUM_SIZE = 4;
+
 type RawOutForTx = {
 	keyImage: string,
 	amount: number,
@@ -230,25 +232,26 @@ export class TransactionsExplorer {
 
 		let hash: string = CnUtils.cn_fast_hash(keyData);
 
-		try {
-			let hashBuf: Uint8Array = CnUtils.hextobin(hash);
-			
-			let nonceBuf = new Uint8Array(12);
-			for (let i = 0; i < 12; i++) {
-				nonceBuf[i] = index % 256;
-				index = Math.floor(index / 256);
-			}
+		let hashBuf: Uint8Array = CnUtils.hextobin(hash);
+		
+		console.log("Extra mess index: " + index);
 
+		let nonceBuf = new Uint8Array(12);
+		for (let i = 0; i < 12; i++) {
+			nonceBuf[i] = index % 256;
+			index = Math.floor(index / 256);
+		}
+
+		try {
 			// typescripted chacha
 			const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
 			let _buf = cha.decrypt(rawMessage);
-
 			decryptedMessage = new TextDecoder("utf-8").decode(_buf);
-
-			console.log("Decrypted Message: " + decryptedMessage);
 		} catch (e) {
 			console.error('JSChaCha8 error ' + e);
 		}
+
+		console.log("Decrypted Message: " + decryptedMessage);
 
 		return decryptedMessage;
 	}
@@ -293,6 +296,7 @@ export class TransactionsExplorer {
 
 		tx_pub_key = CnUtils.bintohex(tx_pub_key);
 		let encryptedPaymentId: string | null = null;
+		let extraIndex: number = 0;
 
 		for (let extra of txExtras) {
 			if (extra.type === TX_EXTRA_NONCE) {
@@ -323,6 +327,7 @@ export class TransactionsExplorer {
 
 				console.log(rawTTL);
 			}
+			extraIndex++;
 		}
 
 		let derivation = null;
@@ -471,7 +476,7 @@ export class TransactionsExplorer {
 			if (rawMessage.length !== 0) {
 				// decode message
 				try {
-					let message: string = this.decryptMessage(0, tx_pub_key, wallet.keys.priv.spend, rawMessage);
+					let message: string = this.decryptMessage(extraIndex, tx_pub_key, wallet.keys.priv.spend, rawMessage);
 					transaction.message = message;
 				} catch (e) {
 					console.log('ERROR IN DECRYPTING MESSAGE: ', e);
