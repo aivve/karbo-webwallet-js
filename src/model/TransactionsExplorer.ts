@@ -208,7 +208,7 @@ export class TransactionsExplorer {
 
 	static decryptMessage(index: number, txPubKey: string, recepientSecretSpendKey: string, rawMessage: string): string | any {
 		let decryptedMessage: string = '';
-		let mlen: number = rawMessage.length;
+		let mlen: number = rawMessage.length / 2;
 
 		if (mlen < TX_EXTRA_MESSAGE_CHECKSUM_SIZE)
 			return null;
@@ -220,17 +220,13 @@ export class TransactionsExplorer {
 			logDebugMsg('UNABLE TO CREATE DERIVATION', e);
 			return null;
 		}
-
 		let magick1 = CnUtils.encode_varint(0x80);
         let magick2 = CnUtils.encode_varint(0);
-
         let keyData: string = derivation + magick1 /*+ magick2*/;
-
 		// length (bin) should be 34
 		console.log("keyData length: " + keyData.length / 2);
 
 		let hash: string = CnUtils.cn_fast_hash(keyData);
-
 		let hashBuf: Uint8Array = CnUtils.hextobin(hash);
 		
 		console.log("Extra mess index: " + index);
@@ -246,22 +242,17 @@ export class TransactionsExplorer {
 		let nonceBuf = new Uint8Array(12);
 		for(let i = 0; i < 12; i++)
 			nonceBuf.set([index/0x100**i], 11-i);
-		//console.log(nonceBuf);
+		console.log(nonceBuf);
 
 		let rawMessArr = CnUtils.hextobin(rawMessage);
 
 		// typescripted chacha
 		const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
 		let _buf = cha.decrypt(rawMessArr);
+
 		decryptedMessage = new TextDecoder().decode(_buf);
 
 		console.log("Decrypted Message: " + decryptedMessage);
-
-		let decryptedMessage1: string = '';
-		for (let i = 1; i < _buf.length; ++i) {
-			decryptedMessage1 += String.fromCharCode(_buf[i]);
-		}
-		console.log("Decrypted Message: " + decryptedMessage1);
 
 		mlen -= TX_EXTRA_MESSAGE_CHECKSUM_SIZE;
 		for (let i = 0; i < TX_EXTRA_MESSAGE_CHECKSUM_SIZE; i++) {
@@ -270,7 +261,7 @@ export class TransactionsExplorer {
 			}
 		}
 
-		return decryptedMessage;
+		return decryptedMessage.slice(0, -TX_EXTRA_MESSAGE_CHECKSUM_SIZE);
 	}
 
 	static parse(rawTransaction: RawDaemon_Transaction, wallet: Wallet): Transaction | null {
@@ -339,7 +330,7 @@ export class TransactionsExplorer {
                 }
 				rawMessage = CnUtils.bintohex(rawMessage);
 
-				console.log("Encrypted Message: " + rawMessage);
+				//console.log("Encrypted Message: " + rawMessage);
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
