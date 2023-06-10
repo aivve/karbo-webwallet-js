@@ -36,6 +36,7 @@
 
 import {Mnemonic} from "./Mnemonic";
 import {Constants} from "./Constants";
+import {JSChaCha8} from './ChaCha8';
 
 declare let Module : any;
 
@@ -62,12 +63,15 @@ let TX_EXTRA_TAGS = {
 	PUBKEY: '01',
 	NONCE: '02',
 	MERGE_MINING: '03',
-	ADDITIONAL_PUBKEY: '04'
+	ADDITIONAL_PUBKEY: '04',
+	MESSAGE_TAG: '04',
+	TTL_TAG: '05',
 };
 let TX_EXTRA_NONCE_TAGS = {
 	PAYMENT_ID: '00',
 	ENCRYPTED_PAYMENT_ID: '01'
 };
+
 let KEY_SIZE = 32;
 let STRUCT_SIZES = {
 	GE_P3: 160,
@@ -1905,7 +1909,9 @@ export namespace CnTransactions{
 		pid_encrypt : boolean,
 		realDestViewKey : string|undefined,
 		unlock_time : number = 0,
-		rct:boolean
+		rct:boolean,
+		message: string,
+		ttl: number
 	){
 		//we move payment ID stuff here, because we need txkey to encrypt
 		let txkey = Cn.random_keypair();
@@ -1924,6 +1930,29 @@ export namespace CnTransactions{
 			let nonce = CnTransactions.get_payment_id_nonce(payment_id, pid_encrypt);
 			logDebugMsg("Extra nonce: " + nonce);
 			extra = CnTransactions.add_nonce_to_extra(extra, nonce);
+		}
+		// encrypt message and add it to the extra
+		// CCX has only 1 dest for messages anyways so we use strings instead of arrays
+		if (message) {
+			message += "0000"; // "checksum"
+			let destKeys = Cn.decode_address(dsts[0].address);
+			let derivation = Cn.generate_key_derivation(destKeys.spend, txkey.sec)
+			let magick1: string = "80";
+        	let magick2: string = "00";
+			let keyData: string = derivation + magick1 + magick2;
+			let hash: string = CnUtils.cn_fast_hash(keyData);
+			let hashBuf: Uint8Array = CnUtils.hextobin(hash);
+			let nonceBuf = new Uint8Array(12);
+			let index: number = 0; // because we only have one message, not an array
+			for(let i = 0; i < 12; i++)
+				nonceBuf.set([index/0x100**i], 11-i);
+			let rawMessArr = CnUtils.hextobin(message);
+			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
+			let _buf = cha.encrypt(rawMessArr);
+
+		}
+		if (ttl !== 0) {
+
 		}
 		let tx : CnTransactions.Transaction = {
 			unlock_time: unlock_time,
@@ -2098,6 +2127,34 @@ export namespace CnTransactions{
 		tx.extra = CnTransactions.add_pub_key_to_extra(tx.extra, txkey.pub);
 		tx.extra = CnTransactions.add_additionnal_pub_keys_to_extra(tx.extra, additional_tx_public_keys);
 
+		// encrypt message and add it to the extra
+		// CCX has only 1 dest for messages anyways so we use strings instead of arrays
+		if (message) {
+			message = message + "0000"; // "checksum"
+			let destKeys = Cn.decode_address(dsts[0].address);
+			let derivation = Cn.generate_key_derivation(destKeys.spend, txkey.sec)
+			let magick1: string = "80";
+        	let magick2: string = "00";
+			let keyData: string = derivation + magick1 + magick2;
+			let hash: string = CnUtils.cn_fast_hash(keyData);
+			let hashBuf: Uint8Array = CnUtils.hextobin(hash);
+			let nonceBuf = new Uint8Array(12);
+			let index: number = 0; // because we only have one message, not an array
+			for(let i = 0; i < 12; i++)
+				nonceBuf.set([index/0x100**i], 11-i);
+			let rawMessArr = CnUtils.hextobin(message);
+			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
+			let _buf = cha.encrypt(rawMessArr);
+			let encryptedMessStr = CnUtils.bintohex(_buf);
+			// append to extra
+			tx.extra = tx.extra + TX_EXTRA_TAGS.MESSAGE_TAG + encryptedMessStr;
+		}
+		if (ttl !== 0) {
+			let ttlStr = CnUtils.encode_varint(ttl);
+			let ttlSize = CnUtils.encode_varint(ttlStr.length);
+			tx.extra = tx.extra + TX_EXTRA_TAGS.TTL_TAG + ttlSize + ttlStr;
+		}
+
 		if (outputs_money.add(fee_amount).compare(inputs_money) > 0) {
 			throw "outputs money (" + Cn.formatMoneyFull(outputs_money) + ") + fee (" + Cn.formatMoneyFull(fee_amount) + ") > inputs money (" + Cn.formatMoneyFull(inputs_money) + ")";
 		}
@@ -2176,7 +2233,9 @@ export namespace CnTransactions{
 									   pid_encrypt : boolean,
 									   realDestViewKey : string|undefined,
 									   unlock_time : number = 0,
-									   rct:boolean
+									   rct:boolean,
+									   message: string,
+									   ttl: number
 	) : CnTransactions.Transaction{
 		let i, j;
 		if (dsts.length === 0) {
@@ -2335,6 +2394,6 @@ export namespace CnTransactions{
 		} else if (cmp > 0) {
 			throw "Need more money than found! (have: " + Cn.formatMoney(found_money) + " need: " + Cn.formatMoney(needed_money) + ")";
 		}
-		return CnTransactions.construct_tx(keys, sources, dsts, fee_amount, payment_id, pid_encrypt, realDestViewKey, unlock_time, rct);
+		return CnTransactions.construct_tx(keys, sources, dsts, fee_amount, payment_id, pid_encrypt, realDestViewKey, unlock_time, rct, message, ttl);
 	}
 }
