@@ -414,7 +414,7 @@ body.transparent #copyright {
 }
 
 .transactions .transaction .txhash {
-	width: 35%;
+	width: 55%;
 	font-size: 12px;
 	font-family: monospace;
 }
