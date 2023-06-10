@@ -48,9 +48,7 @@ export const TX_EXTRA_TAG_PADDING = 0x00;
 export const TX_EXTRA_TAG_PUBKEY = 0x01;
 export const TX_EXTRA_NONCE = 0x02;
 export const TX_EXTRA_MERGE_MINING_TAG = 0x03;
-export const TX_EXTRA_TAG_ADDITIONAL_PUBKEYS = 0x04;
 export const TX_EXTRA_MYSTERIOUS_MINERGATE_TAG = 0xDE;
-
 
 export const TX_EXTRA_NONCE_PAYMENT_ID = 0x00;
 export const TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID = 0x01;
@@ -95,16 +93,14 @@ export class TransactionsExplorer {
 				extraSize = 32;
 				startOffset = 1;
 				hasFoundPubKey = true;
-			} else if (extra[0] === TX_EXTRA_TAG_ADDITIONAL_PUBKEYS) {
-				extraSize = extra[1] * 32;
-				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
 				console.log('Found TX_EXTRA_MESSAGE_TAG');
 				extraSize = extra[1];
 				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TTL) {
-				//extraSize = extra[1];
-				//startOffset = 2;
+				console.log('Found TX_EXTRA_TTL');
+				extraSize = extra[1];
+				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
 				// this tag has to be the last in extra
 				// we do nothing with it
@@ -220,8 +216,8 @@ export class TransactionsExplorer {
 			logDebugMsg('UNABLE TO CREATE DERIVATION', e);
 			return null;
 		}
-		let magick1 = '80';
-        let magick2 = '00';
+		let magick1: string = "80";
+        let magick2: string = "00";
         let keyData: string = derivation + magick1 + magick2;
 		// length (bin) should be 34
 		console.log("keyData length: " + keyData.length / 2);
@@ -240,20 +236,10 @@ export class TransactionsExplorer {
 
 		let rawMessArr = CnUtils.hextobin(rawMessage);
 
-		// typescripted chacha
-		const cha = new JSChaCha8(hashBuf, nonceBuf, 0, 10);
+		const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
 		let _buf = cha.decrypt(rawMessArr);
 
 		decryptedMessage = new TextDecoder().decode(_buf);
-
-		console.log("Decrypted Message: " + decryptedMessage);
-
-		mlen -= TX_EXTRA_MESSAGE_CHECKSUM_SIZE;
-		for (let i = 0; i < TX_EXTRA_MESSAGE_CHECKSUM_SIZE; i++) {
-			if (_buf[mlen + i] != 0) {
-				return null;
-			}
-		}
 
 		return decryptedMessage.slice(0, -TX_EXTRA_MESSAGE_CHECKSUM_SIZE);
 	}
@@ -485,6 +471,9 @@ export class TransactionsExplorer {
 				try {
 					let message: string = this.decryptMessage(extraIndex, tx_pub_key, wallet.keys.priv.spend, rawMessage);
 					transaction.message = message;
+
+					console.log("Decrypted Message: " + message);
+
 				} catch (e) {
 					console.log('ERROR IN DECRYPTING MESSAGE: ', e);
 				}
