@@ -70,6 +70,7 @@
 									</td><!--LEfT-->
 									<td class="timestamp" v-if="transaction.blockHeight > 0">{{$d(new Date(transaction.timestamp*1000), 'long')}}</td>
 									<td class="timestamp" v-else="">{{ $t("accountPage.historyBlock.pendingTxStatus") }}...</td>
+									<td class="txhash">{{ transaction.hash }}</td>
 									<td :class="'amount '+(transaction.getAmount() > 0 ? 'tx_direction_in' : 'tx_direction_out')" >{{ transaction.getAmount() / currencyDivider }}</td>
 									<td class="moreInfo">
 										<i class="fa fa-search" aria-hidden="true" @click="moreInfoOnTx(transaction)"></i>
@@ -77,6 +78,9 @@
 								</tr>
 								<tr v-if="transaction.paymentId !== ''">
 									<td colspan="4" class="paymentId" >{{transaction.paymentId}}</td><!--UNDER-->
+								</tr>
+								<tr v-if="transaction.message !== ''">
+									<td colspan="4" class="txmessage" >{{transaction.message}}</td><!--UNDER-->
 								</tr>
 							</template>
 							<tr v-if="transactions.length == 0">

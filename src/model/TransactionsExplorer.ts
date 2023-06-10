@@ -184,7 +184,6 @@ export class TransactionsExplorer {
 			return false;
 		}
 
-
 		for (let iOut = 0; iOut < rawTransaction.vout.length; iOut++) {
 			let out = rawTransaction.vout[iOut];
 			let txout_k = out.target.data;
@@ -199,7 +198,6 @@ export class TransactionsExplorer {
 
 		return false;
 	}
-
 
 
 	static decryptMessage(index: number, txPubKey: string, recepientSecretSpendKey: string, rawMessage: string): string | any {
@@ -218,21 +216,14 @@ export class TransactionsExplorer {
 		}
 		let magick1: string = "80";
         let magick2: string = "00";
-        let keyData: string = derivation + magick1 + magick2;
-		// length (bin) should be 34
-		console.log("keyData length: " + keyData.length / 2);
-
-		console.log(keyData);
+        let keyData: string = derivation + magick1 + magick2; // length (bin) should be 34
 
 		let hash: string = CnUtils.cn_fast_hash(keyData);
 		let hashBuf: Uint8Array = CnUtils.hextobin(hash);
 		
-		console.log("Extra mess index: " + index);
-
 		let nonceBuf = new Uint8Array(12);
 		for(let i = 0; i < 12; i++)
 			nonceBuf.set([index/0x100**i], 11-i);
-		console.log(nonceBuf);
 
 		let rawMessArr = CnUtils.hextobin(rawMessage);
 

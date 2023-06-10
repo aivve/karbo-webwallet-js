@@ -409,9 +409,16 @@ body.transparent #copyright {
 }
 
 .transactions .transaction .timestamp {
-	width: 45%;
+	width: 25%;
 	font-size: 18px;
 }
+
+.transactions .transaction .txhash {
+	width: 35%;
+	font-size: 12px;
+	font-family: monospace;
+}
+
 
 .transactions .transaction .amount {
 	font-size: 20px;
