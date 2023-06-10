@@ -220,24 +220,18 @@ export class TransactionsExplorer {
 			logDebugMsg('UNABLE TO CREATE DERIVATION', e);
 			return null;
 		}
-		let magick1 = CnUtils.encode_varint(0x80);
-        let magick2 = CnUtils.encode_varint(0);
-        let keyData: string = derivation + magick1 /*+ magick2*/;
+		let magick1 = '80';
+        let magick2 = '00';
+        let keyData: string = derivation + magick1 + magick2;
 		// length (bin) should be 34
 		console.log("keyData length: " + keyData.length / 2);
+
+		console.log(keyData);
 
 		let hash: string = CnUtils.cn_fast_hash(keyData);
 		let hashBuf: Uint8Array = CnUtils.hextobin(hash);
 		
 		console.log("Extra mess index: " + index);
-
-		/*let nonceBuf = new Uint8Array(12);
-		let _index = index;
-		for (let i = 0; i < 12; i++) {
-			nonceBuf[i] = _index % 256;
-			_index = Math.floor(index / 256);
-		}
-		console.log(nonceBuf);*/
 
 		let nonceBuf = new Uint8Array(12);
 		for(let i = 0; i < 12; i++)
@@ -325,7 +319,7 @@ export class TransactionsExplorer {
 				}
 			}
 			else if (extra.type === TX_EXTRA_MESSAGE_TAG) {
-				for (let i = 1; i < extra.data.length; ++i) {
+				for (let i = 0; i < extra.data.length; ++i) {
                     rawMessage += String.fromCharCode(extra.data[i]);
                 }
 				rawMessage = CnUtils.bintohex(rawMessage);
@@ -751,4 +745,3 @@ export class TransactionsExplorer {
 		});
 	}
 }
-

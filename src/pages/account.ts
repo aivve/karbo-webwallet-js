@@ -34,8 +34,8 @@ class AccountView extends DestructableView{
 	@VueVar([]) transactions !: Transaction[];
   @VueVar('') txFilter !: string;
 	@VueVar(0) lastBlockLoading !: number;
+	@VueVar(0) processingTxQueue !: number;
 	@VueVar(0) processingQueue !: number;
-	@VueVar(0) processingTxNum !: number;
 	@VueVar(0) walletAmount !: number;
 	@VueVar(0) unlockedWalletAmount !: number;
 	@VueVar(0) allTransactionsCount !: number;
@@ -88,9 +88,8 @@ class AccountView extends DestructableView{
 	refresh = () => {
 		blockchainExplorer.getHeight().then((height : number) => {
 			this.blockchainHeight = height;
+      this.refreshWallet();
 		});
-
-		this.refreshWallet();
 	}
 
   onFilterChanged = () => {
@@ -173,12 +172,12 @@ class AccountView extends DestructableView{
     let filterChanged = false;
     let oldIsWalletSyncing = this.isWalletSyncing;
     let timeDiff: number = new Date().getTime() - this.refreshTimestamp.getTime();
-    this.processingTxNum = walletWatchdog.getBlockList().getTxQueue().getSize();
+    this.processingTxQueue = walletWatchdog.getBlockList().getTxQueue().getSize();
     this.processingQueue = walletWatchdog.getBlockList().getSize();
     this.lastBlockLoading = walletWatchdog.getLastBlockLoading();
     this.currentScanBlock = wallet.lastHeight;
     this.isWalletSyncing = (wallet.lastHeight + 2) < this.blockchainHeight;
-    this.isWalletProcessing = this.isWalletSyncing || (walletWatchdog.getBlockList().getTxQueue().getSize() > 0);
+    this.isWalletProcessing = this.isWalletSyncing || (walletWatchdog.getBlockList().getTxQueue().hasData());
     
     if (oldIsWalletSyncing && !this.isWalletSyncing) {
       this.checkOptimization();
