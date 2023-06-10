@@ -40,6 +40,7 @@ import {MathUtil} from "./MathUtil";
 import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
 import {RawDaemon_Transaction, RawDaemon_Out} from "./blockchain/BlockchainExplorer";
 import {JSChaCha8} from './ChaCha8';
+import {Varint} from './Varint';
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
 export const TX_EXTRA_NONCE_MAX_COUNT = 255;
@@ -305,11 +306,13 @@ export class TransactionsExplorer {
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
-				for (let i = 1; i < extra.data.length; ++i) {
+				for (let i = 0; i < extra.data.length; ++i) {
 					rawTTL += String.fromCharCode(extra.data[i]);
 				}
-
-				console.log(rawTTL);
+				let ttlStr = CnUtils.bintohex(rawTTL);
+				let uint8Array = CnUtils.hextobin(ttlStr);
+				let ttl = Varint.decode(uint8Array);
+				console.log(ttl);
 			}
 			extraIndex++;
 		}
