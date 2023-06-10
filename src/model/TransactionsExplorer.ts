@@ -95,11 +95,9 @@ export class TransactionsExplorer {
 				startOffset = 1;
 				hasFoundPubKey = true;
 			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
-				console.log('Found TX_EXTRA_MESSAGE_TAG');
 				extraSize = extra[1];
 				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TTL) {
-				console.log('Found TX_EXTRA_TTL');
 				extraSize = extra[1];
 				startOffset = 2;
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
