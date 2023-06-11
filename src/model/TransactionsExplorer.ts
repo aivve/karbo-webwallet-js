@@ -97,11 +97,11 @@ export class TransactionsExplorer {
 			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
 				extraSize = extra[1];
 				startOffset = 2;
-				console.log("Message size: " + extraSize);
+				//console.log("Message size: " + extraSize);
 			} else if (extra[0] === TX_EXTRA_TTL) {
 				extraSize = extra[1];
 				startOffset = 2;
-				console.log("TTL size: " + extraSize);
+				//console.log("TTL size: " + extraSize);
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
 				// this tag has to be the last in extra
 				// we do nothing with it
@@ -237,7 +237,7 @@ export class TransactionsExplorer {
 		let paymentId: string | null = null;
 		let rawMessage: string = '';
 
-		console.log(rawTransaction.extra);
+		//console.log(rawTransaction.extra);
 
 		let txExtras = [];
 		try {
@@ -298,7 +298,7 @@ export class TransactionsExplorer {
                 }
 				rawMessage = CnUtils.bintohex(rawMessage);
 
-				console.log("Encrypted Message: " + rawMessage);
+				//console.log("Encrypted Message: " + rawMessage);
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
@@ -308,7 +308,7 @@ export class TransactionsExplorer {
 				let ttlStr = CnUtils.bintohex(rawTTL);
 				let uint8Array = CnUtils.hextobin(ttlStr);
 				let ttl = Varint.decode(uint8Array);
-				console.log(ttl);
+				//console.log(ttl);
 			}
 			extraIndex++;
 		}
