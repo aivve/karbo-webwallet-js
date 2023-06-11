@@ -208,13 +208,7 @@ export class TransactionsExplorer {
 		if (mlen < TX_EXTRA_MESSAGE_CHECKSUM_SIZE)
 			return null;
 
-		let derivation: string;
-		try {
-			derivation = CnNativeBride.generate_key_derivation(txPubKey, recepientSecretSpendKey);
-		} catch (e) {
-			logDebugMsg('UNABLE TO CREATE DERIVATION', e);
-			return null;
-		}
+		let derivation: string = CnNativeBride.generate_key_derivation(txPubKey, recepientSecretSpendKey);
 		let magick1: string = "80";
         let magick2: string = "00";
         let keyData: string = derivation + magick1 + magick2; // length (bin) should be 34
@@ -242,6 +236,8 @@ export class TransactionsExplorer {
 		let tx_pub_key = '';
 		let paymentId: string | null = null;
 		let rawMessage: string = '';
+
+		console.log(rawTransaction.extra);
 
 		let txExtras = [];
 		try {
