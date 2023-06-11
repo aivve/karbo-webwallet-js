@@ -167,8 +167,8 @@ export class JSChaCha8 {
   /**
    *  Encrypt data with key and nonce
    *
-   * @param {Buffer} data
-   * @return {Buffer}
+   * @param {Uint8Array} data
+   * @return {Uint8Array}
    */
   encrypt = (data: Uint8Array): Uint8Array => {
     return this.update(data);
@@ -177,8 +177,8 @@ export class JSChaCha8 {
   /**
    *  Decrypt data with key and nonce
    *
-   * @param {Buffer} data
-   * @return {Buffer}
+   * @param {Uint8Array} data
+   * @return {Uint8Array}
    */
   decrypt = (data: Uint8Array): Uint8Array => {
     return this.update(data);
