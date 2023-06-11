@@ -2111,7 +2111,7 @@ export namespace CnTransactions{
 			let destKeys = Cn.decode_address(dsts[0].address);
 			let derivation: string = Cn.generate_key_derivation(destKeys.spend, txkey.sec)
 			let magick1: string = "80";
-        	let magick2: string = "00";
+			let magick2: string = "00";
 			let keyData: string = derivation + magick1 + magick2;
 			let hash: string = CnUtils.cn_fast_hash(keyData);
 			let hashBuf: Uint8Array = CnUtils.hextobin(hash);
@@ -2119,11 +2119,6 @@ export namespace CnTransactions{
 			let index: number = 0; // Because we only have one message
 			for(let i = 0; i < 12; i++)
 				nonceBuf.set([index/0x100**i], 11-i);
-			//let messageHex: string = '';
-			//for (let i = 0; i < message.length; ++i) {
-			//	messageHex +=  message.charCodeAt(i).toString(16);
-			//}
-			//let rawMessArr = CnUtils.hextobin(messageHex);
 			let rawMessArr = new TextEncoder().encode(message);
 			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
 			let _buf = cha.encrypt(rawMessArr);
