@@ -97,9 +97,11 @@ export class TransactionsExplorer {
 			} else if (extra[0] === TX_EXTRA_MESSAGE_TAG) {
 				extraSize = extra[1];
 				startOffset = 2;
+				console.log("Message size: " + extraSize);
 			} else if (extra[0] === TX_EXTRA_TTL) {
 				extraSize = extra[1];
 				startOffset = 2;
+				console.log("TTL size: " + extraSize);
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
 				// this tag has to be the last in extra
 				// we do nothing with it
@@ -300,7 +302,7 @@ export class TransactionsExplorer {
                 }
 				rawMessage = CnUtils.bintohex(rawMessage);
 
-				//console.log("Encrypted Message: " + rawMessage);
+				console.log("Encrypted Message: " + rawMessage);
 			}
 			else if (extra.type === TX_EXTRA_TTL) {
 				let rawTTL: string = '';
@@ -461,7 +463,7 @@ export class TransactionsExplorer {
 			if (rawMessage !== '') {
 				// decode message
 				try {
-					let message: string = this.decryptMessage(extraIndex, tx_pub_key, wallet.keys.priv.spend, rawMessage);
+					let message: string = this.decryptMessage(/*extraIndex*/0, tx_pub_key, wallet.keys.priv.spend, rawMessage);
 					transaction.message = message;
 
 					console.log("Decrypted Message: " + message);
