@@ -2107,7 +2107,6 @@ export namespace CnTransactions{
 		// Encrypt message and add it to the extra
 		// CCX has only 1 destination for messages anyways
 		if (message) {
-			message += "0000"; // "checksum"
 			let destKeys = Cn.decode_address(dsts[0].address);
 			let derivation: string = Cn.generate_key_derivation(destKeys.spend, txkey.sec)
 			let magick1: string = "80";
@@ -2120,15 +2119,18 @@ export namespace CnTransactions{
 			for(let i = 0; i < 12; i++)
 				nonceBuf.set([index/0x100**i], 11-i);
 			let rawMessArr = new TextEncoder().encode(message);
+			let rawMessArrFull = new Uint8Array(rawMessArr.length + 4);
+			rawMessArrFull.set(rawMessArr);
+			rawMessArrFull.set([0,0,0,0], rawMessArr.length);
 			const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
-			let _buf = cha.encrypt(rawMessArr);
+			let _buf = cha.encrypt(rawMessArrFull);
 			let encryptedMessStr = CnUtils.bintohex(_buf);
 
 			// Append to extra:
 			// Add message tag
 			tx.extra += TX_EXTRA_TAGS.MESSAGE_TAG;
 			// Encode length of message
-			tx.extra += ('0' + (rawMessArr.length).toString(16)).slice(-2);
+			tx.extra += ('0' + (rawMessArrFull.length).toString(16)).slice(-2);
 			// Write message
 			tx.extra += encryptedMessStr;
 		}
