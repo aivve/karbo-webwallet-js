@@ -225,9 +225,17 @@ export class TransactionsExplorer {
 		const cha = new JSChaCha8(hashBuf, nonceBuf, 0);
 		let _buf = cha.decrypt(rawMessArr);
 
-		decryptedMessage = new TextDecoder().decode(_buf);
+		// Validate checksum
+		mlen = _buf.length - TX_EXTRA_MESSAGE_CHECKSUM_SIZE;
+		for (let i = 0; i < TX_EXTRA_MESSAGE_CHECKSUM_SIZE; i++) {
+			if (_buf[mlen + i] != 0) {
+				return null;
+			}
+		}
 
-		return decryptedMessage.slice(0, -TX_EXTRA_MESSAGE_CHECKSUM_SIZE);
+		decryptedMessage = new TextDecoder().decode(_buf.slice(0, -TX_EXTRA_MESSAGE_CHECKSUM_SIZE));
+
+		return decryptedMessage;
 	}
 
 	static parse(rawTransaction: RawDaemon_Transaction, wallet: Wallet): Transaction | null {
