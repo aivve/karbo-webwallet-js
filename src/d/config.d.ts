@@ -27,6 +27,8 @@ declare var config : {
 	dustThreshold: any,
 	defaultMixin: number, // default mixin
 	txChargeAddress: string,
+	idleTimeout: number,
+    idleWarningDuration: number,
 	syncBlockCount: number,
 	maxBlockQueue: number,
 	maxRemoteNodes: number

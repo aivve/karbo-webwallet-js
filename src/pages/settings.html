@@ -45,10 +45,10 @@
 
 		<div class="panel">
 			<div class="body">
-				<div class="header-title">{{ $t("global.optimize.label") }}</div>
+				<div class="header-title">{{ $t("settingsPage.settingsBlock.optimize.label") }}</div>
 				<div class="actions tc">
-					<button type="button" class="btn primary" @click="optimizeWallet()" :disabled="optimizeLoading">
-						{{ optimizeLoading ? $t('global.optimize.loadingText') : $t('global.optimize.button') }}
+					<button type="button" class="btn" @click="optimizeWallet()" :disabled="optimizeLoading">
+						{{ optimizeLoading ? $t('settingsPage.settingsBlock.optimize.loadingText') : $t('settingsPage.settingsBlock.optimize.button') }}
 					</button>
 				</div>
 			</div>
