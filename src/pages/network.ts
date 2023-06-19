@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+ * Copyright (c) 2018 Gnock
+ * Copyright (c) 2018-2019 The Masari Project
+ * Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ * Copyright (c) 2018-2023 The Karbo developers
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  *
@@ -33,7 +35,7 @@ class NetworkView extends DestructableView {
 	@VueVar(0) networkDifficulty !: number;
 	@VueVar(0) lastReward !: number;
 	@VueVar(0) lastBlockFound !: number;
-	@VueVar(0) connectedNode !: string;
+	@VueVar([]) nodeList !: string[];
 	@VueVar(0) ticker !: string;
 
 	private intervalRefreshStat = 0;
@@ -55,8 +57,7 @@ class NetworkView extends DestructableView {
 
 	refreshStats() {
 		blockchainExplorer.getNetworkInfo().then((info: NetworkInfo) => {
-			//console.log(info);
-			this.connectedNode = info.node;
+			this.nodeList = [...info.nodes];
 			this.networkDifficulty = info.difficulty;
 			this.networkHashrate = VueFilterHashrate(info.difficulty / config.avgBlockTime);
 			this.blockchainHeight = info.height;

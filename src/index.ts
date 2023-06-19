@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+ * Copyright (c) 2018 Gnock
+ * Copyright (c) 2018-2019 The Masari Project
+ * Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ * Copyright (c) 2018-2023 The Karbo developers
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  *
@@ -40,9 +42,11 @@ const i18n = new VueI18n({
 let browserUserLang = ''+(navigator.language || (<any>navigator).userLanguage);
 browserUserLang = browserUserLang.toLowerCase().split('-')[0];
 
-Storage.getItem('user-lang', browserUserLang).then(function(userLang : string){
-	Translations.loadLangTranslation(userLang).catch(function () {
-		Translations.loadLangTranslation('en');
+Storage.getItem('user-lang', browserUserLang).then(function(userLang : string) {
+	Translations.loadLangTranslation(userLang).catch(err => {
+		Translations.loadLangTranslation('en').catch(err => {
+      console.error("Failed to load 'en' language", err);
+    });
 	});
 });
 
@@ -167,7 +171,9 @@ class CopyrightView extends Vue{
 	@VueWatched()
 	languageWatch(){
 		Translations.setBrowserLang(this.language);
-		Translations.loadLangTranslation(this.language);
+		Translations.loadLangTranslation(this.language).catch(err => {
+		console.error(`Failed to load "${this.language}" language`, err);
+	});
 	}
 }
 let copyrightView = new CopyrightView('#copyright');

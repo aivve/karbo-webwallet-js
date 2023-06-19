@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+ * Copyright (c) 2018 Gnock
+ * Copyright (c) 2018-2019 The Masari Project
+ * Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ * Copyright (c) 2018-2023 The Karbo developers
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  *
@@ -32,7 +34,8 @@ export class WalletRepository{
 			password = ('00000000000000000000000000000000'+password).slice(-32);
 		}
 		let privKey = new (<any>TextEncoder)("utf8").encode(password);
-		// Fix cyrillic (non-latin) passwords
+
+		// fix cyrillic (non-latin) passwords
 		if(privKey.length > 32){
 		   privKey = privKey.slice(-32);
 		}
@@ -56,7 +59,7 @@ export class WalletRepository{
 			}catch (e) {
 				decodedRawWallet = null;
 			}
-		}else{//RawWallet
+		} else {//RawWallet
 			//console.log('old wallet format');
 			let oldRawWallet : RawWallet = <any>rawWallet;
 			let encrypted = new Uint8Array(<any>oldRawWallet.encryptedKeys);
@@ -100,6 +103,7 @@ export class WalletRepository{
 		}
 
 		let privKey = new (<any>TextEncoder)("utf8").encode(password);
+
 		// Fix cyrillic (non-latin) passwords
 		if(privKey.length > 32){
 		   privKey = privKey.slice(-32);
@@ -194,11 +198,10 @@ export class WalletRepository{
 		doc.setTextColor(255, 255, 255);
 		doc.setFontSize(10);
 		doc.text(110, 120, "To deposit funds to this paper wallet, send ");
-		doc.text(110, 125, "Karbo to the public address");
-
+		doc.text(110, 125, "Conceal Network to the public address");
 		doc.text(110, 135, "DO NOT REVEAL THE PRIVATE KEY");
 
-		//adding karbo logo
+		//adding Conceal Network logo
 		let c : HTMLCanvasElement|null = <HTMLCanvasElement>document.getElementById('canvasExport');
 		if(c !== null) {
 			let ctx = c.getContext("2d");
@@ -221,7 +224,5 @@ export class WalletRepository{
 		}
 
 	}
-
-
 
 }

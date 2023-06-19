@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+ * Copyright (c) 2018 Gnock
+ * Copyright (c) 2018-2019 The Masari Project
+ * Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ * Copyright (c) 2018-2023 The Karbo developers
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  *
@@ -24,7 +26,7 @@ import {AppState} from "../model/AppState";
 import {Storage} from "../model/Storage";
 import {Translations} from "../model/Translations";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
-import {BlockchainExplorer} from "../model/blockchain/BlockchainExplorer";
+import {BlockchainExplorer, RawDaemon_Out} from "../model/blockchain/BlockchainExplorer";
 import {WalletWatchdog} from "../model/WalletWatchdog";
 import {DeleteWallet} from "../model/DeleteWallet";
 
@@ -35,18 +37,16 @@ let walletWatchdog : WalletWatchdog = DependencyInjectorInstance().getInstance(W
 class SettingsView extends DestructableView{
 	@VueVar(10) readSpeed !: number;
 	@VueVar(false) checkMinerTx !: boolean;
-
 	@VueVar(false) customNode !: boolean;
 	@VueVar('https://node.karbo.org:32448/') nodeUrl !: string;
-
 	@VueVar(0) creationHeight !: number;
 	@VueVar(0) scanHeight !: number;
-
 	@VueVar(-1) maxHeight !: number;
 	@VueVar('en') language !: string;
-
 	@VueVar(0) nativeVersionCode !: number;
 	@VueVar('') nativeVersionNumber !: string;
+	@VueVar(false) optimizeIsNeeded !: boolean;
+	@VueVar(false) optimizeLoading !: boolean;
 
 	constructor(container : string) {
 		super(container);
@@ -59,6 +59,8 @@ class SettingsView extends DestructableView{
 
 		this.creationHeight = wallet.creationHeight;
 		this.scanHeight = wallet.lastHeight;
+
+		this.checkOptimization();
 
 		blockchainExplorer.getHeight().then(function (height: number) {
 			self.maxHeight = height;
@@ -88,6 +90,70 @@ class SettingsView extends DestructableView{
 		DeleteWallet.deleteWallet();
 	}
 
+	resetWallet() {
+		swal({
+			title: i18n.t('settingsPage.resetWalletModal.title'),
+			html: i18n.t('settingsPage.resetWalletModal.content'),
+			showCancelButton: true,
+			confirmButtonText: i18n.t('settingsPage.resetWalletModal.confirmText'),
+			cancelButtonText: i18n.t('settingsPage.resetWalletModal.cancelText'),
+		}).then((result:any) => {
+			if (result.value) {
+        walletWatchdog.stop();
+        wallet.clearTransactions();
+        wallet.resetScanHeight();
+        walletWatchdog.start();
+				window.location.href = '#account';
+			}
+		});
+	}
+
+  checkOptimization = () => {
+    blockchainExplorer.getHeight().then((blockchainHeight: number) => {
+      let optimizeInfo = wallet.optimizationNeeded(blockchainHeight, config.optimizeThreshold);
+      this.optimizeIsNeeded = optimizeInfo.isNeeded;
+    });
+  }
+
+  optimizeWallet = () => {
+    this.optimizeLoading = true; // set loading state to true
+    blockchainExplorer.getHeight().then((blockchainHeight: number) => {
+      let optimizeInfo = wallet.optimizationNeeded(blockchainHeight, config.optimizeThreshold);
+
+      if (optimizeInfo.isNeeded) {
+        wallet.optimize(blockchainHeight, config.optimizeThreshold, blockchainExplorer,
+          function (amounts: number[], numberOuts: number): Promise<RawDaemon_Out[]> {
+            return blockchainExplorer.getRandomOuts(amounts, numberOuts);
+          }).then((processedOuts: number) => {
+            let watchdog: WalletWatchdog = DependencyInjectorInstance().getInstance(WalletWatchdog.name);
+            //force a mempool check so the user is up to date
+            if (watchdog !== null) {
+              watchdog.checkMempool();
+            }
+            this.optimizeLoading = false; // set loading state to false
+            setTimeout(() => {
+              this.checkOptimization(); // check if optimization is still needed
+            }, 1000);  
+          }).catch((err) => {
+            console.log(err);
+            this.optimizeLoading = false; // set loading state to false
+            setTimeout(() => {
+              this.checkOptimization(); // check if optimization is still needed
+            }, 1000);  
+          });
+      } else {
+        swal({
+          title: i18n.t('settingsPage.optimizeWalletModal.title'),
+          html: i18n.t('settingsPage.optimizeWalletModal.content'),
+          confirmButtonText: i18n.t('settingsPage.optimizeWalletModal.confirmText'),
+          showCancelButton: false
+        }).then((result:any) => {
+          this.optimizeLoading = false;
+        });    
+      }
+    });
+  }
+
 	@VueWatched()	readSpeedWatch(){this.updateWalletOptions();}
 	@VueWatched()	checkMinerTxWatch(){this.updateWalletOptions();}
 	@VueWatched()	customNodeWatch(){this.updateWalletOptions();}
@@ -108,6 +174,7 @@ class SettingsView extends DestructableView{
 		options.customNode = this.customNode;
 		options.nodeUrl = this.nodeUrl;
 		wallet.options = options;
+    walletWatchdog.setupWorkers();
 		walletWatchdog.signalWalletUpdate();
 	}
 
@@ -121,9 +188,16 @@ class SettingsView extends DestructableView{
 		let options = wallet.options;
 		options.customNode = this.customNode;
 		options.nodeUrl = this.nodeUrl;
-		config.nodeUrl = this.nodeUrl;
 		wallet.options = options;
-		walletWatchdog.signalWalletUpdate();
+
+    if (options.customNode) {
+      Storage.setItem('customNodeUrl', options.nodeUrl);
+    } else {
+      Storage.remove('customNodeUrl');
+    }
+
+    // reset the node connection workers with new values
+    BlockchainExplorerProvider.getInstance().resetNodes();
 	}
 }
 

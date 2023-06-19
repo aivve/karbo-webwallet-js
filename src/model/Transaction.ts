@@ -1,9 +1,11 @@
 /**
- *	   Copyright (c) 2018, Gnock
+ *     Copyright (c) 2014-2018, MyMonero.com
+ *     Copyright (c) 2018, Gnock
  *     Copyright (c) 2018-2020, ExploShot
  *     Copyright (c) 2018-2020, The Qwertycoin Project
  *     Copyright (c) 2018-2020, The Masari Project
- *     Copyright (c) 2014-2018, MyMonero.com
+ *     Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ *     Copyright (c) 2018-2023 The Karbo developers
  *
  *     All rights reserved.
  *     Redistribution and use in source and binary forms, with or without modification,
@@ -133,6 +135,7 @@ export class Transaction {
         if (typeof raw.fees !== 'undefined') transac.fees = raw.fee;
         if (typeof raw.hash !== 'undefined') transac.hash = raw.hash;
         if (typeof raw.is_coinbase !== 'undefined') transac.is_coinbase = raw.is_coinbase;
+
         return transac;
     }
 
@@ -179,12 +182,15 @@ export class Transaction {
     }
 
     isConfirmed(blockchainHeight: number) {
-        if (this.isCoinbase() && this.blockHeight + config.txCoinbaseMinConfirms < blockchainHeight) {
-            return true;
-        } else if (!this.isCoinbase() && this.blockHeight + config.txMinConfirms < blockchainHeight) {
-            return true;
-        }
+      if (this.blockHeight === 0) {
         return false;
+      } else if (this.isCoinbase() && this.blockHeight + config.txCoinbaseMinConfirms < blockchainHeight) {
+        return true;
+      } else if (!this.isCoinbase() && this.blockHeight + config.txMinConfirms < blockchainHeight) {
+        return true;
+      }
+      
+      return false;
     }
 
     isFullyChecked() {

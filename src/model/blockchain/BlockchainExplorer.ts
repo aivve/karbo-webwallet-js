@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2018, Gnock
- * Copyright (c) 2018, The Masari Project
+ * Copyright (c) 2018 Gnock
+ * Copyright (c) 2018-2019 The Masari Project
+ * Copyright (c) 2018-2023 Conceal Community, Conceal.Network & Conceal Devs
+ * Copyright (c) 2018-2023 The Karbo developers
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
  *
@@ -37,7 +39,7 @@ export type RawDaemon_Transaction = {
 };
 
 export type NetworkInfo = {
-    node: string,
+    nodes: string[],
     major_version: number,
     hash: string,
     reward: number,
@@ -63,7 +65,9 @@ export interface BlockchainExplorer {
 
     getScannedHeight(): number;
 
-    watchdog(wallet: Wallet): void;
+    resetNodes(): void;
+
+    start(wallet: Wallet): void;
 
     getTransactionPool(): Promise<RawDaemon_Transaction[]>;
 
