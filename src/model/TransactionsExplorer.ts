@@ -486,11 +486,16 @@
              view: wallet.keys.priv.view
            },
            splittedDsts, 
-           wallet.getPublicAddress(),
            usingOuts,
-           mix_outs, mixin, neededFee,
-           payment_id, pid_encrypt,
-           realDestViewKey, 0, rct);
+           mix_outs,
+           mixin,
+           neededFee,
+           payment_id,
+           pid_encrypt,
+           realDestViewKey,
+           0,
+           rct
+         );
 
          logDebugMsg("signed tx: ", signed);
          let raw_tx_and_hash = CnTransactions.serialize_tx_with_hash(signed);

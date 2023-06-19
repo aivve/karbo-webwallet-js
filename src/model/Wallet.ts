@@ -106,10 +106,10 @@ export class Wallet extends Observable {
 
 	private _options : WalletOptions = new WalletOptions();
 
-  signalChanged = () => {
-    this.modifiedTS = new Date();
-    this.modified = true;
-  }
+	signalChanged = () => {
+		this.modifiedTS = new Date();
+		this.modified = true;
+	}
 
 	exportToRaw = (): RawWallet => {
 		let transactions : any[] = [];
@@ -232,7 +232,7 @@ export class Wallet extends Observable {
 			} else {
 				for(let tr = 0; tr < this.transactions.length; ++tr) {
 					if(this.transactions[tr].txPubKey === transaction.txPubKey) {
-            this.txLookupMap.set(transaction.txPubKey, transaction);
+						this.txLookupMap.set(transaction.txPubKey, transaction);
 						this.transactions[tr] = transaction;
 					}
 				}
@@ -247,9 +247,9 @@ export class Wallet extends Observable {
 				}
 			}
 
-		// finalize the add tx function
-		this.recalculateKeyImages();
-		this.signalChanged();
+			// finalize the add tx function
+			this.recalculateKeyImages();
+			this.signalChanged();
 			this.notify();
 		}
 	}
@@ -260,11 +260,11 @@ export class Wallet extends Observable {
 
 		for (let i = 0; i < this.txsMem.length; ++i) {
 			if (this.txsMem[i].hash === transaction.hash) {
-			if (replace) {
-			this.txsMem[i] = transaction;
-			modified = true;
-			}
-			foundTx = true;
+				if (replace) {
+				this.txsMem[i] = transaction;
+				modified = true;
+				}
+				foundTx = true;
 			}
 		}
 
@@ -352,11 +352,11 @@ export class Wallet extends Observable {
 		}
 		news.sort((a,b) =>{
 			return a.timestamp - b.timestamp;
-		})
+		})    
 		return news;
 	}
 
-	totalAmount() : number{
+	get amount() : number{
 		return this.unlockedAmount(-1);
 	}
 
@@ -377,7 +377,7 @@ export class Wallet extends Observable {
 			}
 		}
 
-    // debug log of mem pool
+		// debug log of mem pool
 		logDebugMsg("mempool tx", this.txsMem);
 
 		for (let transaction of this.txsMem) {
@@ -385,7 +385,7 @@ export class Wallet extends Observable {
 				for (let nout of transaction.outs) {
 					amount += nout.amount;
 				}
-      }
+			}
 
 			for(let nin of transaction.ins){
 				amount -= nin.amount;
@@ -568,7 +568,7 @@ export class Wallet extends Observable {
                 let nbOutsNeeded: number = config.defaultMixin + 1;
                 let lotsMixOuts: any[] = await obtainMixOutsCallback(amounts, nbOutsNeeded);
 
-                let data = await TransactionsExplorer.createRawTx(dsts, this, false, usingOuts, false, lotsMixOuts, config.defaultMixin, neededFee, '', '', 0);
+                let data = await TransactionsExplorer.createRawTx(dsts, this, false, usingOuts, false, lotsMixOuts, config.defaultMixin, neededFee, '');
                 await blockchainExplorer.sendRawTx(data.raw.raw);
                 this.addTxPrivateKeyWithTxHash(data.raw.hash, data.raw.prvkey);
                 logDebugMsg('optimization done', processedOuts);

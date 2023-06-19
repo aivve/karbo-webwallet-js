@@ -10,7 +10,6 @@ myGlobal.config = {
 		"https://node.karbo.org:32448/",
 		"https://node2.karbo.org:32448/"
 	],
-	nodeUrl: "",
 	mainnetExplorerUrl: "http://explorer.karbowanec.com/",
 	mainnetExplorerUrlHash: "http://explorer.karbowanec.com/?hash={ID}#blockchain_transaction",
 	mainnetExplorerUrlBlock: "http://explorer.karbowanec.com/?hash={ID}#blockchain_block",
@@ -39,9 +38,6 @@ myGlobal.config = {
 	avgBlockTime: 240,
 	maxBlockNumber: 500000000,
 };
-
-let randInt = Math.floor(Math.random() * Math.floor(config.nodeList.length));
-config.nodeUrl = config.nodeList[randInt];
 
 function logDebugMsg(...data: any[]) {
   if (config.debug) {

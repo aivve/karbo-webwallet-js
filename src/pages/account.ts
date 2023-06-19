@@ -38,6 +38,9 @@ class AccountView extends DestructableView{
 	@VueVar(0) processingQueue !: number;
 	@VueVar(0) walletAmount !: number;
 	@VueVar(0) unlockedWalletAmount !: number;
+	@VueVar(0) allTransactionsCount !: number;
+	@VueVar(0) pagesCount !: number;
+	@VueVar(0) txPerPage !: number;
 	@VueVar(0) ticker !: string;
 	@VueVar(0) currentScanBlock !: number;
 	@VueVar(0) blockchainHeight !: number;
@@ -159,7 +162,6 @@ class AccountView extends DestructableView{
           `+feesHtml+`
           `+txPrivKeyMessage+`
           <div>`+i18n.t('accountPage.txDetails.blockHeight')+`: <a href="`+explorerUrlBlock.replace('{ID}', ''+transaction.blockHeight)+`" target="_blank">`+transaction.blockHeight+`</a></div>
-          <div>`+i18n.t('accountPage.txDetails.message')+`:` + transaction.message + `
         </div>`
 		});
 	}
