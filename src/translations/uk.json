@@ -95,7 +95,10 @@
 	  "title": "Аккаунт",
 	  "subtitle": "Огляд вашого профілю та історії транзакцій",
 	  "synchronizingBlock": {
-		"text": "Синхронізація..."
+		"text": "Синхронізація...",
+		"lastBlock": "Блок",
+        "Queue": "Черга",
+        "Transactions": "Тр."
 	  },
 	  "balanceBlock": {
 		"title": "Ваш баланс",
@@ -357,10 +360,17 @@
 		},
 		"nodeUrl":{
 		  "label":"Адреса URL вузла"
+		},
+		"optimize": {
+		  "label": "Оптимізація",
+		  "subtitle": "Гаманець потребує оптимізації",
+		  "button": "Оптимізувати",
+		  "loadingText": "Триває оптимізація, зачейкайте..."
 		}
 	  },
 	  "changePasswordButton":"Змінити пароль мого гаманця",
 	  "deleteWalletButton":"Видалити мій гаманець (локальну копію)",
+	  "resetWalletButton": "Скинути гаманець і синхронізувати заново",
 	  "walletSettings":{
 		"creationHeight":{
 		  "label":"Висота створення гаманця"
@@ -375,7 +385,18 @@
 		"content":"Ви ДІЙСНО впевнені що хочете видалити свій гаманець?",
 		"confirmText":"Так, я знаю що роблю",
 		"cancelText":"Скасувати"
-	  }
+	  },
+	  "resetWalletModal": {
+        "title": "Скинути гаманець (локальну копію)",
+        "content": "Впевнені що хочете скинути гаманець?",
+        "confirmText": "Так, я впевнений",
+        "cancelText": "Скасувати"
+      },
+      "optimizeWalletModal": {
+        "title": "Опимізація непотрібна...",
+        "content": "Ваш гаманець оптимізований.",
+        "confirmText": "Гаразд"
+      }
 	},
 	"importBasePage":{
 	  "parametersBlock":{
