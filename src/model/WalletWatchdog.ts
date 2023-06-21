@@ -31,6 +31,7 @@
  */
 
 import {Wallet} from "./Wallet";
+import {WalletOptions} from "./Wallet";
 import {BlockchainExplorer, RawDaemon_Transaction} from "./blockchain/BlockchainExplorer";
 import {Transaction} from "./Transaction";
 import {TransactionsExplorer} from "./TransactionsExplorer";
@@ -380,17 +381,19 @@ class ParseWorker {
 class SyncWorker {
   private isWorking: boolean;
   private explorer: BlockchainExplorer;
+  private options: WalletOptions;
 
-  constructor(explorer: BlockchainExplorer) {
+  constructor(explorer: BlockchainExplorer, options: WalletOptions) {
     this.isWorking = false;
     this.explorer = explorer;
+    this.options = options;
   }
 
   fetchBlocks = (startBlock: number, endBlock: number): Promise<{transactions: RawDaemon_Transaction[], lastBlock: number}> => {
     this.isWorking = true;
 
 		return new Promise<any>((resolve, reject) => {
-      this.explorer.getTransactionsForBlocks(startBlock, endBlock, false).then((transactions: RawDaemon_Transaction[]) => {
+      this.explorer.getTransactionsForBlocks(startBlock, endBlock, this.options.checkMinerTx).then((transactions: RawDaemon_Transaction[]) => {
         resolve({
           transactions: transactions,
           lastBlock: endBlock
@@ -447,7 +450,7 @@ export class WalletWatchdog {
 
     // create a worker for each random node
     for (let i = 0; i < config.nodeList.length; ++i) {
-      this.syncWorkers.push(new SyncWorker(this.explorer));
+      this.syncWorkers.push(new SyncWorker(this.explorer, this.wallet.options));
     }
 
     this.setupWorkers();
