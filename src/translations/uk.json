@@ -361,12 +361,6 @@
 		},
 		"nodeUrl":{
 		  "label":"Адреса URL вузла"
-		},
-		"optimize": {
-		  "label": "Оптимізація",
-		  "subtitle": "Гаманець потребує оптимізації",
-		  "button": "Оптимізувати",
-		  "loadingText": "Триває оптимізація, зачейкайте..."
 		}
 	  },
 	  "changePasswordButton":"Змінити пароль мого гаманця",
@@ -386,17 +380,12 @@
 		"content":"Ви ДІЙСНО впевнені що хочете видалити свій гаманець?",
 		"confirmText":"Так, я знаю що роблю",
 		"cancelText":"Скасувати"
-	  },
-	  "resetWalletModal": {
+	},
+      "resetWalletModal": {
         "title": "Скинути гаманець (локальну копію)",
         "content": "Впевнені що хочете скинути гаманець?",
         "confirmText": "Так, я впевнений",
         "cancelText": "Скасувати"
-      },
-      "optimizeWalletModal": {
-        "title": "Опимізація непотрібна...",
-        "content": "Ваш гаманець оптимізований.",
-        "confirmText": "Гаразд"
       }
 	},
 	"importBasePage":{

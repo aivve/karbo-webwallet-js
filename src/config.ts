@@ -3,13 +3,14 @@ let myGlobal : any = typeof window !== 'undefined' ? window : self;
 myGlobal.config = {
 	debug: false,
 	apiUrl: [
-		"https://karbo.club/services/node_web/"
+		"https://node.karbo.io:32448/"
 	],
     nodeList: [
 		"https://karbo.club/services/node_web/",
 		"https://node.karbo.org:32448/",
-		"https://node2.karbo.org:32448/"
+		"https://node.karbo.io:32448/"
 	],
+	nodeUrl: "",
 	mainnetExplorerUrl: "http://explorer.karbowanec.com/",
 	mainnetExplorerUrlHash: "http://explorer.karbowanec.com/?hash={ID}#blockchain_transaction",
 	mainnetExplorerUrlBlock: "http://explorer.karbowanec.com/?hash={ID}#blockchain_block",

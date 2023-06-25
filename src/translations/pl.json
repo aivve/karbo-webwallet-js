@@ -348,17 +348,18 @@
 		  "label":"Język"
 		},
 		"readMinerTx":{
-		  "label":"Czytaj transakcje dla górników (tylko w przypadku wydobycia solo)"
+		  "label":"Wzzytuj transakcje wydobycia (tylko w przypadku wydobycia solo)"
 		},
         "customNode":{
-          "label":"Use custom node"
+          "label":"Użyj włąsnego węzła"
         },
         "nodeUrl":{
-          "label":"Node URL"
+          "label":"URL węzła"
         }
 	  },
     "changePasswordButton":"Zmień moje hasło do portfela",
-	  "deleteWalletButton":"Usuń mój portfel (kopia lokalna)",
+	  "deleteWalletButton":"Usuń mój portfel (kopię lokalną)",
+    "resetWalletButton": "Zresetuj i ponownie przeskanuj portfel",
 	  "walletSettings":{
 		"creationHeight":{
 		  "label":"Wysokość bloku tworzenia portfela"
@@ -369,11 +370,17 @@
 		"updateButton":"Aktualizacja"
 	  },
 	  "deleteWalletModal":{
-		"title":"Usuń mój portfel (kopia lokalna)",
-		"content":"Czy jesteś pewny i NAPRAWDĘ chcesz usunąc swój portfel?",
-		"confirmText":"Tak, jestem pewny",
-		"cancelButtonText":"Przerwij"
-	  }
+      "title":"Usuń mój portfel (kopię lokalną)",
+      "content":"Czy jesteś pewny i NAPRAWDĘ chcesz usunąc swój portfel?",
+      "confirmText":"Tak, jestem pewny",
+      "cancelButtonText":"Przerwij"
+	  },
+    "resetWalletModal": {
+      "title": "Zresetuj mój portfel (kopię lokalną)",
+      "content": "Czy na pewno chcesz zresetować swój portfel?",
+      "confirmText": "Tak, jestem pewny",
+      "cancelText": "Przerwij"
+    }
   },
   "importBasePage":{
     "parametersBlock":{

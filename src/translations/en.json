@@ -361,12 +361,6 @@
 		},
 	    "nodeUrl":{
 		  "label":"Node URL"
-		},
-		"optimize": {
-		  "label": "Optimization",
-		  "subtitle": "Your wallet needs to be optimized",
-		  "button": "Optimize Now",
-		  "loadingText": "Optimizing, please wait..."
 		}
 	  },
 	  "changePasswordButton":"Change my wallet password",
@@ -392,11 +386,6 @@
         "content": "Are you sure you really want to reset your wallet?",
         "confirmText": "Yes I'm sure",
         "cancelText": "Cancel"
-      },
-      "optimizeWalletModal": {
-        "title": "Nothing to do...",
-        "content": "Your wallet is already optimized.",
-        "confirmText": "OK"
       }
 	},
 	"importBasePage":{
