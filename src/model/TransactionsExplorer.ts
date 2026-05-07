@@ -76,6 +76,11 @@ type TxExtra = {
 
 export class TransactionsExplorer {
 
+	static isCtActivated(blockchainHeight: number): boolean {
+		let forkHeight = new JSBigInt(typeof config.ctForkHeight !== 'undefined' ? config.ctForkHeight : '4294967294');
+		return new JSBigInt(blockchainHeight).compare(forkHeight) >= 0;
+	}
+
 	static parseExtra(oExtra: number[]): TxExtra[] {
 		let extra = oExtra.slice();
 		let extras: TxExtra[] = [];
@@ -573,7 +578,7 @@ export class TransactionsExplorer {
 		Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }> {
 		return new Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }>(function (resolve, reject) {
 
-			let useCt = true;
+			let useCt = TransactionsExplorer.isCtActivated(blockchainHeight);
 			if (useCt) {
 				if (mixin > CT_MAX_MIXIN) {
 					reject('ct_mixin_too_big');
