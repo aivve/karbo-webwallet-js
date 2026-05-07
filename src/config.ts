@@ -26,7 +26,7 @@ myGlobal.config = {
 	subAddressPrefixTestnet: 113,
 	coinFee: new JSBigInt('10000000000'),
 	dustThreshold: new JSBigInt('100000000'),//used for choosing outputs/change - we decompose all the way down if the receiver wants now regardless of threshold
-	defaultMixin: 3, // default value mixin
+	defaultMixin: 15, // CT default: 15 decoys + real input = ring size 16
 	syncBlockCount: 1000,
 	coinSymbol: 'KRB',
 	openAliasPrefix: "krb",

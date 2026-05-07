@@ -52,6 +52,9 @@ export const TX_EXTRA_MYSTERIOUS_MINERGATE_TAG = 0xDE;
 export const TX_EXTRA_NONCE_PAYMENT_ID = 0x00;
 export const TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID = 0x01;
 
+const CT_MIN_MIXIN = 3;
+const CT_MAX_MIXIN = 15;
+
 type RawOutForTx = {
 	keyImage: string,
 	amount: any,
@@ -62,7 +65,8 @@ type RawOutForTx = {
 	ctCommitment?: string,
 	ctMaskedAmount?: string,
 	ctBlinding?: string,
-	ring_amount?: any
+	ring_amount?: any,
+	is_coinbase?: boolean
 };
 
 type TxExtra = {
@@ -486,7 +490,8 @@ export class TransactionsExplorer {
 					ctCommitment: out.ctCommitment,
 					ctMaskedAmount: out.ctMaskedAmount,
 					ctBlinding: out.ctBlinding,
-					ring_amount: out.ctRingAmount || (out.ctCommitment !== '' ? CnTransactions.ctConfidentialOutputAmount() : out.amount)
+					ring_amount: out.ctRingAmount || (out.ctCommitment !== '' ? CnTransactions.ctConfidentialOutputAmount() : out.amount),
+					is_coinbase: tr.is_coinbase
 				});
 			}
 		}
@@ -569,6 +574,15 @@ export class TransactionsExplorer {
 		return new Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }>(function (resolve, reject) {
 
 			let useCt = true;
+			if (useCt) {
+				if (mixin > CT_MAX_MIXIN) {
+					reject('ct_mixin_too_big');
+					return;
+				}
+				if (mixin !== 0 && mixin < CT_MIN_MIXIN) {
+					mixin = CT_MIN_MIXIN;
+				}
+			}
 			let neededFee = new JSBigInt((<any>window).config.coinFee);
 			if (useCt && neededFee.compare(CnTransactions.ctMinimumDenomination()) < 0) {
 				neededFee = CnTransactions.ctMinimumDenomination();
@@ -714,18 +728,42 @@ export class TransactionsExplorer {
 					amounts.push(ringAmount === CnTransactions.ctConfidentialOutputAmount() ? CnTransactions.ctConfidentialOutputAmountRpc() : ringAmount);
 				}
 
-				let nbOutsNeeded: number = mixin + 1;
+				let allInputsAreCoinbase = useCt && usingOuts.length > 0 && usingOuts.every(function(out: RawOutForTx) {
+					return out.is_coinbase === true;
+				});
+				let requestedMixin = allInputsAreCoinbase ? 0 : mixin;
+				let nbOutsNeeded: number = requestedMixin + 1;
 
-				obtainMixOutsCallback(amounts, nbOutsNeeded).then(function (lotsMixOuts: any[]) {
+				let signWithMixins = function(lotsMixOuts: any[], txMixin: number) {
 					console.log('------------------------------mix_outs');
 					console.log('amounts', amounts);
 					console.log('lots_mix_outs', lotsMixOuts);
 
-					TransactionsExplorer.createRawTx(dsts, wallet, useCt, usingOuts, pid_encrypt, lotsMixOuts, mixin, neededFee, paymentId, accountRegistration).then(function (data: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
+					if (useCt && txMixin > 0) {
+						let hasFullRing = lotsMixOuts.length === usingOuts.length;
+						for (let i = 0; hasFullRing && i < lotsMixOuts.length; ++i) {
+							hasFullRing = (lotsMixOuts[i].outs || []).length >= txMixin + 1;
+						}
+						if (!hasFullRing) {
+							reject('ct_not_enough_mixins');
+							return;
+						}
+					}
+
+					TransactionsExplorer.createRawTx(dsts, wallet, useCt, usingOuts, pid_encrypt, lotsMixOuts, txMixin, neededFee, paymentId, accountRegistration).then(function (data: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
 						resolve(data);
 					}).catch(function (e) {
 						reject(e);
 					});
+				};
+
+				if (requestedMixin === 0) {
+					signWithMixins([], 0);
+					return;
+				}
+
+				obtainMixOutsCallback(amounts, nbOutsNeeded).then(function (lotsMixOuts: any[]) {
+					signWithMixins(lotsMixOuts, requestedMixin);
 				}).catch(function (e) {
 					console.error('Failed to obtain mix outs', e);
 					reject(e);
