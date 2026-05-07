@@ -146,18 +146,18 @@
 	  "subtitle": "Apperçu de votre compte et de l'historique des transactions",
 	  "recentTransactions": "Transactions récentes",
 	  "allTransactions": "Toutes les transactions",
-	  "accountNumber": "Account number",
-	  "address": "Address",
-	  "registerAccount": "Register account number",
+	  "accountNumber": "Numéro de compte",
+	  "address": "Adresse",
+	  "registerAccount": "Enregistrer un numéro de compte",
 	  "registerAccountModal": {
-		"title": "Register Account Number",
-		"content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-		"confirmText": "Register",
-		"cancelText": "Cancel",
-		"confirmingTitle": "Confirm Registration",
-		"confirmingContent": "Network fee: {fees} KRB",
-		"successTitle": "Registration Sent!",
-		"successContent": "Your account number will be available after the transaction is confirmed."
+		"title": "Enregistrer un numéro de compte",
+		"content": "Cela créera une transaction pour enregistrer un numéro de compte lisible pour l'adresse de votre portefeuille. Des frais réseau minimes seront facturés.",
+		"confirmText": "Enregistrer",
+		"cancelText": "Annuler",
+		"confirmingTitle": "Confirmer l'enregistrement",
+		"confirmingContent": "Frais réseau : {fees} KRB",
+		"successTitle": "Enregistrement envoyé !",
+		"successContent": "Votre numéro de compte sera disponible après la confirmation de la transaction."
 	  },
 	  "synchronizingBlock": {
 		"text": "Synchronisation en cours "
@@ -282,10 +282,10 @@
 	  "title":"Envoyer des KRB",
 	  "sendBlock":{
 		"address":{
-		  "label":"Adresse de destination or account number",
-		  "placeholder":"Address or account number (e.g. 1256970-1-P)",
+		  "label":"Adresse de destination ou numéro de compte",
+		  "placeholder":"Adresse ou numéro de compte (ex. 1256970-1-P)",
 		  "invalid":"L'adresse de destination est invalide",
-		  "accountNumberNotFound":"Account number not found",
+		  "accountNumberNotFound":"Numéro de compte introuvable",
 		  "fundsTo":"Les fonds seront envoyé à ",
 		  "receiver":"Destinataire",
 		  "description":"Description"
@@ -299,8 +299,15 @@
 		  "invalid":"L'identifiant du paiement est invalid. La longeur doit être de 16 ou 64 caractères"
 		},
 		"mixin":{
-		  "label":"Confidentialité",
-		  "invalid":"Le mixin est invalide, doit être compris entre 3 et 10 ou zéro"
+		  "label":"Taille de l'anneau",
+		  "invalid":"La taille de l'anneau est invalide, elle doit être comprise entre 4 et 16"
+		},
+		"fee":{
+		  "label":"Frais",
+		  "invalid":"Les frais sont invalides, ils doivent être compris entre 0.01 et 0.1 KRB"
+		},
+		"advanced":{
+		  "title":"Avancé"
 		},
 		"sendButton":"Envoyer",
 		"cancelButton":"Annuler"
@@ -357,7 +364,7 @@
 		"address":{
 		  "title":"Votre adresse pour recevoir des fonds",
 		  "label":"Donner cette adresse pour recevoir des fonds",
-		  "accountNumberLabel":"Account number"
+		  "accountNumberLabel":"Votre numéro de compte"
 		},
 		"qrCode":{
 		  "title":"Ou personnalisez ce QR Code",

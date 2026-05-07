@@ -146,18 +146,18 @@
 	  "subtitle": "Panoramica del tuo account e cronologia delle transazioni",
 	  "recentTransactions": "Transazioni recenti",
 	  "allTransactions": "Tutte le transazioni",
-	  "accountNumber": "Account number",
-	  "address": "Address",
-	  "registerAccount": "Register account number",
+	  "accountNumber": "Numero account",
+	  "address": "Indirizzo",
+	  "registerAccount": "Registra numero account",
 	  "registerAccountModal": {
-		"title": "Register Account Number",
-		"content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-		"confirmText": "Register",
-		"cancelText": "Cancel",
-		"confirmingTitle": "Confirm Registration",
-		"confirmingContent": "Network fee: {fees} KRB",
-		"successTitle": "Registration Sent!",
-		"successContent": "Your account number will be available after the transaction is confirmed."
+		"title": "Registra numero account",
+		"content": "Verrà creata una transazione per registrare un numero account leggibile per l'indirizzo del tuo wallet. Verrà addebitata una piccola commissione di rete.",
+		"confirmText": "Registra",
+		"cancelText": "Annulla",
+		"confirmingTitle": "Conferma registrazione",
+		"confirmingContent": "Commissione di rete: {fees} KRB",
+		"successTitle": "Registrazione inviata!",
+		"successContent": "Il tuo numero account sarà disponibile dopo la conferma della transazione."
 	  },
 	  "synchronizingBlock": {
 		"text": "Sincronizzazione... "
@@ -282,10 +282,10 @@
 	  "title":"Invia KRB",
 	  "sendBlock":{
 		"address":{
-		  "label":"Indirizzo di destinazione or account number",
-		  "placeholder":"Address or account number (e.g. 1256970-1-P)",
+		  "label":"Indirizzo di destinazione o numero account",
+		  "placeholder":"Indirizzo o numero account (es. 1256970-1-P)",
 		  "invalid":"L'indirizzo di destinazione è errato",
-		  "accountNumberNotFound":"Account number not found",
+		  "accountNumberNotFound":"Numero account non trovato",
 		  "fundsTo":"I fondi verranno inviati a ",
 		  "receiver":"Destinatario",
 		  "description":"Descrizione"
@@ -299,8 +299,15 @@
 		  "invalid":"Il Payment ID è invalido. La lunghezza deve essere di 16 o 64 caratteri"
 		},
 		"mixin":{
-		  "label":"Riservatezza",
-		  "invalid":"Il mixin non è valido, dovrebbe essere compreso tra 3 e 10 o zero"
+		  "label":"Dimensione anello",
+		  "invalid":"La dimensione dell'anello non è valida, deve essere da 4 a 16"
+		},
+		"fee":{
+		  "label":"Commissione",
+		  "invalid":"La commissione non è valida, deve essere da 0.01 a 0.1 KRB"
+		},
+		"advanced":{
+		  "title":"Avanzate"
 		},
 		"sendButton":"Invia",
 		"cancelButton":"Annulla"
@@ -357,7 +364,7 @@
 		"address":{
 		  "title":"Il tuo indirizzo per ricevere i fondi",
 		  "label":"Dai questo indirizzo per ricevere fondi",
-		  "accountNumberLabel":"Account number"
+		  "accountNumberLabel":"Il tuo numero account"
 		},
 		"qrCode":{
 		  "title":"O personalizza il codice QR",

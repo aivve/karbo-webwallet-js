@@ -625,6 +625,46 @@ html[data-theme="light"] .receiveTab .qrCode canvas {
 	display: inline-block;
 	color: var(--color-primary-light);
 }
+.sendTab .advancedBlock {
+	border-bottom: 1px solid var(--color-border);
+	border-top: 1px solid var(--color-border);
+	margin-bottom: 1rem;
+	margin-top: 0.75rem;
+	padding: 0.35rem 0;
+}
+.sendTab .advancedToggle {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	color: var(--color-text);
+	cursor: pointer;
+	display: flex;
+	font: inherit;
+	font-weight: 600;
+	gap: 0.5rem;
+	padding: 0.625rem 0;
+	text-align: left;
+	width: 100%;
+}
+.sendTab .advancedToggle .fa {
+	color: var(--color-text-muted);
+	font-size: 0.75rem;
+	width: 1rem;
+}
+.sendTab .advancedFields {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	padding-bottom: 0.5rem;
+}
+.sendTab .advancedFields .field {
+	margin-bottom: 0.75rem;
+}
+@media screen and (max-width: 640px) {
+	.sendTab .advancedFields {
+		grid-template-columns: 1fr;
+	}
+}
 
 /* QR Scanning Overlay */
 .qrCodeScanningContainer {

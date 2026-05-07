@@ -30,6 +30,10 @@ import {WalletWatchdog} from "../model/WalletWatchdog";
 
 let wallet: Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
 let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
+const MIN_RING_SIZE = 4;
+const MAX_RING_SIZE = 16;
+const MIN_FEE = '0.01';
+const MAX_FEE = '0.1';
 
 AppState.enableLeftMenu();
 
@@ -42,8 +46,11 @@ class SendView extends DestructableView {
 	@VueVar(true) amountToSendValid !: boolean;
 	@VueVar('') paymentId !: string;
 	@VueVar(true) paymentIdValid !: boolean;
-	@VueVar('3') mixIn !: string;
-	@VueVar(true) mixinIsValid !: boolean;
+	@VueVar(false) advancedOpen !: boolean;
+	@VueVar('16') ringSize !: string;
+	@VueVar(true) ringSizeIsValid !: boolean;
+	@VueVar('0.01') fee !: string;
+	@VueVar(true) feeIsValid !: boolean;
 
 	@VueVar(null) domainAliasAddress !: string | null;
 	@VueVar(null) txDestinationName !: string | null;
@@ -75,6 +82,8 @@ class SendView extends DestructableView {
 		if (destinationName !== null) this.txDestinationName = destinationName.substr(0, 256);
 		if (description !== null) this.txDescription = description.substr(0, 256);
 		if (redirect !== null) this.redirectUrlAfterSend = decodeURIComponent(redirect);
+		this.ringSize = (config.defaultMixin + 1).toString();
+		this.fee = Cn.formatMoney((<any>window).config.coinFee);
 
 		this.nfcAvailable = this.nfc.has;
 	}
@@ -93,7 +102,11 @@ class SendView extends DestructableView {
 		this.accountNumberValid = true;
 		this.txDestinationName = null;
 		this.txDescription = null;
-		this.mixIn = config.defaultMixin.toString();
+		this.advancedOpen = false;
+		this.ringSize = (config.defaultMixin + 1).toString();
+		this.fee = MIN_FEE;
+		this.ringSizeIsValid = true;
+		this.feeIsValid = true;
 
 		this.stopScan();
 	}
@@ -244,6 +257,16 @@ class SendView extends DestructableView {
 				//TODO use biginteger
 				let amountToSend = amount * Math.pow(10, config.coinUnitPlaces);
 				let destinationAddress = self.destinationAddress;
+				let feeToSendWith = self.parseMoneyToAtomic(self.fee);
+				if (feeToSendWith === null || !self.feeIsValid) {
+					swal({
+						type: 'error',
+						title: i18n.t('sendPage.invalidAmountModal.title'),
+						html: i18n.t('sendPage.sendBlock.fee.invalid'),
+						confirmButtonText: i18n.t('sendPage.invalidAmountModal.confirmText'),
+					});
+					return;
+				}
 
 				swal({
 					title: i18n.t('sendPage.creatingTransferModal.title'),
@@ -253,7 +276,7 @@ class SendView extends DestructableView {
 					}
 				});
 
-				let mixinToSendWith: number = parseInt(self.mixIn);
+				let mixinToSendWith: number = parseInt(self.ringSize) - 1;
 
 				TransactionsExplorer.createTx([{address: destinationAddress, amount: amountToSend}], self.paymentId, wallet, blockchainHeight,
 					function (amounts: any[], numberOuts: number): Promise<RawDaemon_OutsForAmount[]> {
@@ -302,7 +325,9 @@ class SendView extends DestructableView {
 							}, 1);
 						});
 					},
-					mixinToSendWith).then(function (rawTxData: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
+					mixinToSendWith,
+					false,
+					feeToSendWith).then(function (rawTxData: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
 					blockchainExplorer.sendRawTx(rawTxData.raw.raw).then(function () {
 						//save the tx private key
 						wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvkey);
@@ -482,17 +507,58 @@ class SendView extends DestructableView {
 	}
 
 	@VueWatched()
-	mixinWatch() {
+	ringSizeWatch() {
 		try {
-			this.mixinIsValid = !isNaN(parseFloat(this.mixIn));
+			this.ringSizeIsValid = !isNaN(parseFloat(this.ringSize));
 
-			let mixin: number =  parseFloat(this.mixIn);
-			if (mixin > 10 || (mixin < 3 && mixin !== 0))
-			    this.mixinIsValid = false;
+			let ringSize: number = parseFloat(this.ringSize);
+			if (ringSize > MAX_RING_SIZE || ringSize < MIN_RING_SIZE || Math.floor(ringSize) !== ringSize)
+			    this.ringSizeIsValid = false;
 
 		} catch (e) {
-			this.mixinIsValid = false;
+			this.ringSizeIsValid = false;
 		}
+	}
+
+	@VueWatched()
+	feeWatch() {
+		this.feeIsValid = this.parseMoneyToAtomic(this.fee) !== null;
+	}
+
+	parseMoneyToAtomic(amount: string): any {
+		try {
+			let normalized = (amount || '').trim();
+			if (!/^[0-9]+(\.[0-9]+)?$/.test(normalized)) {
+				return null;
+			}
+			let parts = normalized.split('.');
+			let whole = parts[0];
+			let decimal = parts.length > 1 ? parts[1] : '';
+			if (decimal.length > config.coinUnitPlaces) {
+				return null;
+			}
+			while (decimal.length < config.coinUnitPlaces) {
+				decimal += '0';
+			}
+			let atomic = new JSBigInt((whole + decimal).replace(/^0+/, '') || '0');
+			let minFee = new JSBigInt(this.moneyStringToAtomicString(MIN_FEE));
+			let maxFee = new JSBigInt(this.moneyStringToAtomicString(MAX_FEE));
+			if (atomic.compare(minFee) < 0 || atomic.compare(maxFee) > 0) {
+				return null;
+			}
+			return atomic;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	moneyStringToAtomicString(amount: string): string {
+		let parts = amount.split('.');
+		let decimal = parts.length > 1 ? parts[1] : '';
+		while (decimal.length < config.coinUnitPlaces) {
+			decimal += '0';
+		}
+		return (parts[0] + decimal).replace(/^0+/, '') || '0';
 	}
 }
 

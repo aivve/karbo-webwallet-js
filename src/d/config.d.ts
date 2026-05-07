@@ -23,6 +23,7 @@ declare var config : {
 	integratedAddressPrefixTestnet: number,
 	subAddressPrefix: number,
 	subAddressPrefixTestnet: number,
+	coinFee: any,
 	dustThreshold: any,
 	defaultMixin: number, // default mixin
 	txChargeAddress: string,

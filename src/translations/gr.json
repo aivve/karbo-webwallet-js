@@ -146,18 +146,18 @@
 	  "subtitle": "Επισκόπηση του λογαριασμού σας και ιστορικό συναλλαγών",
 	  "recentTransactions": "Πρόσφατες συναλλαγές",
 	  "allTransactions": "Όλες οι συναλλαγές",
-	  "accountNumber": "Account number",
-	  "address": "Address",
-	  "registerAccount": "Register account number",
+	  "accountNumber": "Αριθμός λογαριασμού",
+	  "address": "Διεύθυνση",
+	  "registerAccount": "Καταχώριση αριθμού λογαριασμού",
 	  "registerAccountModal": {
-		"title": "Register Account Number",
-		"content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-		"confirmText": "Register",
-		"cancelText": "Cancel",
-		"confirmingTitle": "Confirm Registration",
-		"confirmingContent": "Network fee: {fees} KRB",
-		"successTitle": "Registration Sent!",
-		"successContent": "Your account number will be available after the transaction is confirmed."
+		"title": "Καταχώριση αριθμού λογαριασμού",
+		"content": "Θα δημιουργηθεί μια συναλλαγή για την καταχώριση ενός ευανάγνωστου αριθμού λογαριασμού για τη διεύθυνση του πορτοφολιού σας. Θα χρεωθεί μικρή προμήθεια δικτύου.",
+		"confirmText": "Καταχώριση",
+		"cancelText": "Ακύρωση",
+		"confirmingTitle": "Επιβεβαίωση καταχώρισης",
+		"confirmingContent": "Προμήθεια δικτύου: {fees} KRB",
+		"successTitle": "Η καταχώριση στάλθηκε!",
+		"successContent": "Ο αριθμός λογαριασμού σας θα είναι διαθέσιμος μετά την επιβεβαίωση της συναλλαγής."
 	  },
 	  "synchronizingBlock": {
 		"text": "Συγχρονισμός..."
@@ -282,10 +282,10 @@
 	  "title":"Στείλτε KRB",
 	  "sendBlock":{
 		"address":{
-		  "label":"Διεύθυνση παραλήπτη or account number",
-		  "placeholder":"Address or account number (e.g. 1256970-1-P)",
+		  "label":"Διεύθυνση παραλήπτη ή αριθμός λογαριασμού",
+		  "placeholder":"Διεύθυνση ή αριθμός λογαριασμού (π.χ. 1256970-1-P)",
 		  "invalid":"Η διεύθυνση παραλήπτη είναι άκυρη",
-		  "accountNumberNotFound":"Account number not found",
+		  "accountNumberNotFound":"Ο αριθμός λογαριασμού δεν βρέθηκε",
 		  "fundsTo":"Τα χρήματά θα σταλούν στην ακόλουθη διεύθυνση",
 		  "receiver":"Παραλήπτης",
 		  "description":"Περιγραφή"
@@ -299,8 +299,15 @@
 		  "invalid":"Το payment ID είναι άκυρο. Πρέπει να αποτελείται από 16 ή 64 χαρακτήρες"
 		},
 		"mixin":{
-		  "label":"Μυστικότητα",
-		  "invalid":"Το mixin δεν είναι έγκυρο, θα πρέπει να είναι από 3 έως 10 ή μηδέν"
+		  "label":"Μέγεθος δακτυλίου",
+		  "invalid":"Το μέγεθος δακτυλίου δεν είναι έγκυρο, πρέπει να είναι από 4 έως 16"
+		},
+		"fee":{
+		  "label":"Χρέωση",
+		  "invalid":"Η χρέωση δεν είναι έγκυρη, πρέπει να είναι από 0.01 έως 0.1 KRB"
+		},
+		"advanced":{
+		  "title":"Προχωρημένα"
 		},
 		"sendButton":"Αποστολή",
 		"cancelButton":"Ακύρωση"
@@ -357,7 +364,7 @@
 		"address":{
 		  "title":"Η διεύθυνσή σας για λήψη χρημάτων:",
 		  "label":"Δώστε αυτή τη διεύθυνση για να λάβετε χρήματα",
-		  "accountNumberLabel":"Account number"
+		  "accountNumberLabel":"Ο αριθμός λογαριασμού σας"
 		},
 		"qrCode":{
 		  "title":"Ή εξατομικεύστε το QR code:",

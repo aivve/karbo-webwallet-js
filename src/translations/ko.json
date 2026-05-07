@@ -146,18 +146,18 @@
       "subtitle": "계정 정보 및 트랜젝션 기록",
       "recentTransactions": "최근 거래",
       "allTransactions": "모든 거래",
-      "accountNumber": "Account number",
-      "address": "Address",
-      "registerAccount": "Register account number",
+      "accountNumber": "계정 번호",
+      "address": "주소",
+      "registerAccount": "계정 번호 등록",
       "registerAccountModal": {
-        "title": "Register Account Number",
-        "content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-        "confirmText": "Register",
-        "cancelText": "Cancel",
-        "confirmingTitle": "Confirm Registration",
-        "confirmingContent": "Network fee: {fees} KRB",
-        "successTitle": "Registration Sent!",
-        "successContent": "Your account number will be available after the transaction is confirmed."
+        "title": "계정 번호 등록",
+        "content": "지갑 주소에 사람이 읽기 쉬운 계정 번호를 등록하는 트랜잭션을 생성합니다. 소액의 네트워크 수수료가 부과됩니다.",
+        "confirmText": "등록",
+        "cancelText": "취소",
+        "confirmingTitle": "등록 확인",
+        "confirmingContent": "네트워크 수수료: {fees} KRB",
+        "successTitle": "등록이 전송되었습니다!",
+        "successContent": "계정 번호는 트랜잭션이 확인된 후 사용할 수 있습니다."
       },
       "synchronizingBlock": {
         "text": "동기화중..."
@@ -285,10 +285,10 @@
       "title": "카르보 코인 보내기",
       "sendBlock": {
         "address": {
-          "label": "주소 or account number",
-          "placeholder": "Address or account number (e.g. 1256970-1-P)",
+          "label": "대상 주소 또는 계정 번호",
+          "placeholder": "주소 또는 계정 번호 (예: 1256970-1-P)",
           "invalid": "입력해 주신 주소가 올바르지 않습니다.",
-          "accountNumberNotFound": "Account number not found",
+          "accountNumberNotFound": "계정 번호를 찾을 수 없습니다",
           "fundsTo": "적어주신 주소로 쿼티코인이 전송됩니다.",
           "receiver": "받는 이",
           "description": "설명"
@@ -302,8 +302,15 @@
           "invalid": "페이먼트 ID가 올바르지 않습니다. 올바른 ID의 문자길이는 16 또는 64 문자입니다."
         },
         "mixin":{
-          "label":"은둔",
-          "invalid":"믹스인이 잘못되었습니다. 3에서 10 또는 0이어야 합니다."
+          "label":"링 크기",
+          "invalid":"링 크기가 잘못되었습니다. 4에서 16이어야 합니다."
+        },
+        "fee":{
+          "label":"수수료",
+          "invalid":"수수료가 잘못되었습니다. 0.01에서 0.1 KRB이어야 합니다."
+        },
+        "advanced":{
+          "title":"고급"
         },
         "sendButton": "보내기",
         "cancelButton": "취소"
@@ -360,7 +367,7 @@
         "address": {
           "title": "주소:",
           "label": "이 주소로 송금을 받습니다.",
-          "accountNumberLabel": "Account number"
+          "accountNumberLabel": "내 계정 번호"
         },
         "qrCode": {
           "title": "QR코드 만들기:",

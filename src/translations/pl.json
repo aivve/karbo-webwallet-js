@@ -146,18 +146,18 @@
         "subtitle": "Przegląd Twojego konta i historia transakcji",
         "recentTransactions": "Ostatnie transakcje",
         "allTransactions": "Wszystkie transakcje",
-        "accountNumber": "Account number",
-        "address": "Address",
-        "registerAccount": "Register account number",
+        "accountNumber": "Numer konta",
+        "address": "Adres",
+        "registerAccount": "Zarejestruj numer konta",
         "registerAccountModal": {
-          "title": "Register Account Number",
-          "content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-          "confirmText": "Register",
-          "cancelText": "Cancel",
-          "confirmingTitle": "Confirm Registration",
-          "confirmingContent": "Network fee: {fees} KRB",
-          "successTitle": "Registration Sent!",
-          "successContent": "Your account number will be available after the transaction is confirmed."
+          "title": "Zarejestruj numer konta",
+          "content": "Zostanie utworzona transakcja rejestrująca czytelny numer konta dla adresu Twojego portfela. Zostanie pobrana niewielka opłata sieciowa.",
+          "confirmText": "Zarejestruj",
+          "cancelText": "Anuluj",
+          "confirmingTitle": "Potwierdź rejestrację",
+          "confirmingContent": "Opłata sieciowa: {fees} KRB",
+          "successTitle": "Rejestracja wysłana!",
+          "successContent": "Twój numer konta będzie dostępny po potwierdzeniu transakcji."
         },
         "synchronizingBlock": {
         "text": "Synchronizuję..."
@@ -283,10 +283,10 @@
     "title":"Wyślij KRB",
     "sendBlock":{
       "address":{
-        "label":"Adres dotacji or account number",
-        "placeholder":"Address or account number (e.g. 1256970-1-P)",
+        "label":"Adres docelowy lub numer konta",
+        "placeholder":"Adres lub numer konta (np. 1256970-1-P)",
         "invalid":"Adres docelowy jest nieprawidłowy",
-        "accountNumberNotFound":"Account number not found",
+        "accountNumberNotFound":"Nie znaleziono numeru konta",
         "fundsTo":"Środki zostaną wysłane na adres",
         "receiver":"Odbiorca",
         "description":"Opis"
@@ -300,8 +300,15 @@
         "invalid":"Identyfikator płatności jest nieprawidłowy. Długość musi wynosić 64 znaki"
       },
       "mixin":{
-        "label":"Poufność",
-        "invalid":"Mieszanka jest nieprawidłowa, powinna wynosić od 3 do 10 lub zero"
+        "label":"Liczność pierścienia",
+        "invalid":"Liczność pierścienia jest nieprawidłowa, powinna wynosić od 4 do 16"
+      },
+      "fee":{
+        "label":"Opłata",
+        "invalid":"Opłata jest nieprawidłowa, powinna wynosić od 0.01 do 0.1 KRB"
+      },
+      "advanced":{
+        "title":"Zaawansowane"
       },
       "sendButton":"Wyślij",
       "cancelButton":"Przerwij"
@@ -358,7 +365,7 @@
 		"address":{
 		  "title":"Twój adres, aby otrzymać fundusze:",
 		  "label":"Podaj ten adres, aby otrzymać fundusze",
-		  "accountNumberLabel":"Account number"
+		  "accountNumberLabel":"Twój numer konta"
 		},
 		"qrCode":{
 		  "title":"Lub spersonalizuj kod QR:",

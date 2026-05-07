@@ -574,7 +574,8 @@ export class TransactionsExplorer {
 		obtainMixOutsCallback: (amounts: any[], numberOuts: number) => Promise<RawDaemon_OutsForAmount[]>,
 		confirmCallback: (amount: number, feesAmount: number) => Promise<void>,
 		mixin: number = config.defaultMixin,
-		accountRegistration: boolean = false):
+		accountRegistration: boolean = false,
+		feeAmount: any = null):
 		Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }> {
 		return new Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }>(function (resolve, reject) {
 
@@ -588,7 +589,7 @@ export class TransactionsExplorer {
 					mixin = CT_MIN_MIXIN;
 				}
 			}
-			let neededFee = new JSBigInt((<any>window).config.coinFee);
+			let neededFee = feeAmount === null ? new JSBigInt((<any>window).config.coinFee) : new JSBigInt(feeAmount);
 			if (useCt && neededFee.compare(CnTransactions.ctMinimumDenomination()) < 0) {
 				neededFee = CnTransactions.ctMinimumDenomination();
 			}

@@ -57,17 +57,33 @@
 				</div>
 			</div>
 
-			<div class="field">
-				<label>{{ $t("sendPage.sendBlock.mixin.label") }}</label>
-				<input class="amountInput" type="number" min="0" max="10" v-model="mixIn" placeholder="3"
-				    @change="() => { if(this.mixIn > 10 || this.mixIn < 3 || Number.isNaN(parseInt(this.mixIn))) { this.mixIn = 0 }}" :readonly="lockedForm"/>
-				<div v-if="!mixinIsValid && mixIn != ''" class="message error">
-					{{ $t("sendPage.sendBlock.mixin.invalid") }}
+			<div class="advancedBlock">
+				<button type="button" class="advancedToggle" @click="advancedOpen = !advancedOpen" :aria-expanded="advancedOpen ? 'true' : 'false'">
+					<i class="fa" :class="advancedOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+					<span>{{ $t("sendPage.sendBlock.advanced.title") }}</span>
+				</button>
+
+				<div class="advancedFields" v-if="advancedOpen">
+					<div class="field">
+						<label>{{ $t("sendPage.sendBlock.mixin.label") }}</label>
+						<input class="amountInput" type="number" min="4" max="16" step="1" v-model="ringSize" placeholder="16" :readonly="lockedForm"/>
+						<div v-if="!ringSizeIsValid && ringSize != ''" class="message error">
+							{{ $t("sendPage.sendBlock.mixin.invalid") }}
+						</div>
+					</div>
+
+					<div class="field">
+						<label>{{ $t("sendPage.sendBlock.fee.label") }}</label>
+						<input class="amountInput" type="number" min="0.01" max="0.1" step="0.01" v-model="fee" placeholder="0.01" :readonly="lockedForm"/>
+						<div v-if="!feeIsValid && fee != ''" class="message error">
+							{{ $t("sendPage.sendBlock.fee.invalid") }}
+						</div>
+					</div>
 				</div>
 			</div>
 
 			<div class="tc" style="margin-top:0.5rem;">
-				<button type="button" class="btn primary" style="width:100%;" @click="send()" :disabled="!destinationAddressValid || !amountToSendValid">{{ $t("sendPage.sendBlock.sendButton") }}</button>
+				<button type="button" class="btn primary" style="width:100%;" @click="send()" :disabled="!destinationAddressValid || !amountToSendValid || !ringSizeIsValid || !feeIsValid">{{ $t("sendPage.sendBlock.sendButton") }}</button>
 			</div>
 			<div class="tc" style="margin-top:0.5rem;" v-if="lockedForm">
 				<button type="button" class="btn basic" style="width:100%;" @click="reset()">{{ $t("sendPage.sendBlock.cancelButton") }}</button>

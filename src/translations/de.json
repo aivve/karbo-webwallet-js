@@ -146,18 +146,18 @@
 	  "subtitle": "Überblick über deinen Account und deine Transactionshistorie",
 	  "recentTransactions": "Letzte Transaktionen",
 	  "allTransactions": "Alle Transaktionen",
-	  "accountNumber": "Account number",
-	  "address": "Address",
-	  "registerAccount": "Register account number",
+	  "accountNumber": "Kontonummer",
+	  "address": "Adresse",
+	  "registerAccount": "Kontonummer registrieren",
 	  "registerAccountModal": {
-		"title": "Register Account Number",
-		"content": "This will create a transaction to register a human-readable account number for your wallet address. A small network fee will be charged.",
-		"confirmText": "Register",
-		"cancelText": "Cancel",
-		"confirmingTitle": "Confirm Registration",
-		"confirmingContent": "Network fee: {fees} KRB",
-		"successTitle": "Registration Sent!",
-		"successContent": "Your account number will be available after the transaction is confirmed."
+		"title": "Kontonummer registrieren",
+		"content": "Dies erstellt eine Transaktion, um eine menschenlesbare Kontonummer für deine Wallet-Adresse zu registrieren. Es fällt eine kleine Netzwerkgebühr an.",
+		"confirmText": "Registrieren",
+		"cancelText": "Abbrechen",
+		"confirmingTitle": "Registrierung bestätigen",
+		"confirmingContent": "Netzwerkgebühr: {fees} KRB",
+		"successTitle": "Registrierung gesendet!",
+		"successContent": "Deine Kontonummer ist verfügbar, sobald die Transaktion bestätigt wurde."
 	  },
 	  "synchronizingBlock": {
 		"text": "Synchronisiere "
@@ -282,10 +282,10 @@
 	  "title":"Schicke KRB",
 	  "sendBlock":{
 		"address":{
-		  "label":"Zieladresse or account number",
-		  "placeholder":"Address or account number (e.g. 1256970-1-P)",
+		  "label":"Zieladresse oder Kontonummer",
+		  "placeholder":"Adresse oder Kontonummer (z. B. 1256970-1-P)",
 		  "invalid":"Die Zieladresse ist ungültig",
-		  "accountNumberNotFound":"Account number not found",
+		  "accountNumberNotFound":"Kontonummer nicht gefunden",
 		  "fundsTo":"Das Guthaben wird an folgende Adresse gesendet werden",
 		  "receiver":"Empfänger",
 		  "description":"Beschreibung"
@@ -299,8 +299,15 @@
 		  "invalid":"Die payment ID ist ungültig. Sie muss aus 16 oder 64 Zeichen bestehen"
 		},
 		"mixin":{
-		  "label":"Geheimhaltung",
-		  "invalid":"Das Mixin ist ungültig, sollte zwischen 3 und 10 oder null liegen"
+		  "label":"Ringgröße",
+		  "invalid":"Die Ringgröße ist ungültig, sollte zwischen 4 und 16 liegen"
+		},
+		"fee":{
+		  "label":"Gebühr",
+		  "invalid":"Die Gebühr ist ungültig, sollte zwischen 0.01 und 0.1 KRB liegen"
+		},
+		"advanced":{
+		  "title":"Erweitert"
 		},
 		"sendButton":"Senden",
 		"cancelButton":"Abbrechen"
@@ -357,7 +364,7 @@
 		"address":{
 		  "title":"Deine Adresse um Guthaben zu empfangen",
 		  "label":"Stelle diese Adresse bereit um Guthaben zu empfangen",
-		  "accountNumberLabel":"Account number"
+		  "accountNumberLabel":"Deine Kontonummer"
 		},
 		"qrCode":{
 		  "title":"Oder personalisiere den QR code",
