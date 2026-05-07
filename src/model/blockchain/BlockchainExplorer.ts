@@ -61,6 +61,11 @@ export type RawDaemon_Out = {
     ring_amount?: string
 }
 
+export type RawDaemon_OutsForAmount = {
+    amount: any,
+    outs: RawDaemon_Out[]
+}
+
 
 export interface BlockchainExplorer {
     resolveOpenAlias(str: string): Promise<{ address: string, name: string | null }>;
@@ -77,7 +82,7 @@ export interface BlockchainExplorer {
 
     sendRawTx(rawTx: string): Promise<any>;
 
-    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_Out[]>;
+    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_OutsForAmount[]>;
 
     getNetworkInfo(): Promise<NetworkInfo>;
 

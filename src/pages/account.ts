@@ -22,7 +22,7 @@ import {AppState} from "../model/AppState";
 import {Transaction} from "../model/Transaction";
 import {Cn} from "../model/Cn";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
-import {BlockchainExplorer, RawDaemon_Out} from "../model/blockchain/BlockchainExplorer";
+import {BlockchainExplorer, RawDaemon_OutsForAmount} from "../model/blockchain/BlockchainExplorer";
 import {TransactionsExplorer} from "../model/TransactionsExplorer";
 import {WalletWatchdog} from "../model/WalletWatchdog";
 
@@ -189,7 +189,7 @@ class AccountView extends DestructableView{
 					'',
 					wallet,
 					blockchainHeight,
-					function (amounts: any[], numberOuts: number): Promise<RawDaemon_Out[]> {
+					function (amounts: any[], numberOuts: number): Promise<RawDaemon_OutsForAmount[]> {
 						return blockchainExplorer.getRandomOuts(amounts, numberOuts);
 					},
 					function (amount: number, feesAmount: number): Promise<void> {

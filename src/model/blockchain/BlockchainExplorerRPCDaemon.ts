@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import {BlockchainExplorer, NetworkInfo, RawDaemon_Transaction, RawDaemon_Out, RemoteNodeInformation} from "./BlockchainExplorer";
+import {BlockchainExplorer, NetworkInfo, RawDaemon_Transaction, RawDaemon_Out, RawDaemon_OutsForAmount, RemoteNodeInformation} from "./BlockchainExplorer";
 import {Wallet} from "../Wallet";
 import {MathUtil} from "../MathUtil";
 import {CnTransactions, CnUtils} from "../Cn";
@@ -251,15 +251,18 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         });
     }
 
-    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_Out[]> {
+    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_OutsForAmount[]> {
+        let requestAmounts = amounts.map((amount: any) => {
+            return amount === CnTransactions.ctConfidentialOutputAmount() ? CnTransactions.ctConfidentialOutputAmountRpc() : amount;
+        });
         return this.makeRequest('POST', 'getrandom_outs', {
-            amounts: amounts,
+            amounts: requestAmounts,
             outs_count: nbOutsNeeded
         }).then((response: {
-            status: 'OK' | 'string',
-            outs: { global_index: number, public_key: string }[]
+            status: 'OK' | string,
+            outs: { amount: any, outs: RawDaemon_Out[] }[]
         }) => {
-            if (response.status !== 'OK') throw 'invalid_getrandom_outs_answer';
+            if (response.status !== 'OK') throw {error: 'invalid_getrandom_outs_answer', response: response};
             if (response.outs.length > 0) {
                 console.log("Got random outs: ");
                 console.log(response.outs);

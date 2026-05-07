@@ -24,7 +24,7 @@ import {QRReader} from "../model/QRReader";
 import {AppState} from "../model/AppState";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
 import {NdefMessage, Nfc} from "../model/Nfc";
-import {BlockchainExplorer, RawDaemon_Out} from "../model/blockchain/BlockchainExplorer";
+import {BlockchainExplorer, RawDaemon_OutsForAmount} from "../model/blockchain/BlockchainExplorer";
 import {Cn} from "../model/Cn";
 import {WalletWatchdog} from "../model/WalletWatchdog";
 
@@ -256,7 +256,7 @@ class SendView extends DestructableView {
 				let mixinToSendWith: number = parseInt(self.mixIn);
 
 				TransactionsExplorer.createTx([{address: destinationAddress, amount: amountToSend}], self.paymentId, wallet, blockchainHeight,
-					function (amounts: any[], numberOuts: number): Promise<RawDaemon_Out[]> {
+					function (amounts: any[], numberOuts: number): Promise<RawDaemon_OutsForAmount[]> {
 						return blockchainExplorer.getRandomOuts(amounts, numberOuts);
 					}
 					, function (amount: number, feesAmount: number): Promise<void> {

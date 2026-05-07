@@ -1051,6 +1051,10 @@ export namespace CnTransactions{
 		return CT_CONFIDENTIAL_OUTPUT_AMOUNT;
 	}
 
+	export function ctConfidentialOutputAmountRpc() {
+		return -1;
+	}
+
 	export function ctMinimumDenomination() {
 		return CT_MIN_DENOMINATION;
 	}

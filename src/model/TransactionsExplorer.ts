@@ -35,7 +35,7 @@ import {Transaction, TransactionIn, TransactionOut} from "./Transaction";
 import {Wallet} from "./Wallet";
 import {MathUtil} from "./MathUtil";
 import {Cn, CnNativeBride, CnRandom, CnTransactions, CnUtils} from "./Cn";
-import {RawDaemon_Transaction, RawDaemon_Out} from "./blockchain/BlockchainExplorer";
+import {RawDaemon_Transaction, RawDaemon_OutsForAmount} from "./blockchain/BlockchainExplorer";
 import hextobin = CnUtils.hextobin;
 
 export const TX_EXTRA_PADDING_MAX_COUNT = 255;
@@ -561,7 +561,7 @@ export class TransactionsExplorer {
 		userPaymentId: string = '',
 		wallet: Wallet,
 		blockchainHeight: number,
-		obtainMixOutsCallback: (amounts: any[], numberOuts: number) => Promise<RawDaemon_Out[]>,
+		obtainMixOutsCallback: (amounts: any[], numberOuts: number) => Promise<RawDaemon_OutsForAmount[]>,
 		confirmCallback: (amount: number, feesAmount: number) => Promise<void>,
 		mixin: number = config.defaultMixin,
 		accountRegistration: boolean = false):
@@ -710,7 +710,8 @@ export class TransactionsExplorer {
 
 				let amounts: any[] = [];
 				for (let l = 0; l < usingOuts.length; l++) {
-					amounts.push(usingOuts[l].ring_amount || (usingOuts[l].ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : usingOuts[l].amount));
+					let ringAmount = usingOuts[l].ring_amount || (usingOuts[l].ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : usingOuts[l].amount);
+					amounts.push(ringAmount === CnTransactions.ctConfidentialOutputAmount() ? CnTransactions.ctConfidentialOutputAmountRpc() : ringAmount);
 				}
 
 				let nbOutsNeeded: number = mixin + 1;
@@ -725,10 +726,15 @@ export class TransactionsExplorer {
 					}).catch(function (e) {
 						reject(e);
 					});
+				}).catch(function (e) {
+					console.error('Failed to obtain mix outs', e);
+					reject(e);
 				});
 
 				//https://github.com/moneroexamples/openmonero/blob/ebf282faa8d385ef3cf97e6561bd1136c01cf210/README.md
 				//https://github.com/moneroexamples/openmonero/blob/95bc207e1dd3881ba0795c02c06493861de8c705/src/YourMoneroRequests.cpp
+			}).catch(function (e) {
+				reject(e);
 			});
 		});
 	}
