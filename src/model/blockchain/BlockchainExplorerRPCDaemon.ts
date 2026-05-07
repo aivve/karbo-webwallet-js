@@ -251,7 +251,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         });
     }
 
-    getRandomOuts(amounts: number[], nbOutsNeeded: number): Promise<RawDaemon_Out[]> {
+    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_Out[]> {
         return this.makeRequest('POST', 'getrandom_outs', {
             amounts: amounts,
             outs_count: nbOutsNeeded

@@ -54,11 +54,15 @@ export const TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID = 0x01;
 
 type RawOutForTx = {
 	keyImage: string,
-	amount: number,
+	amount: any,
 	public_key: string,
 	index: number,
 	global_index: number,
-	tx_pub_key: string
+	tx_pub_key: string,
+	ctCommitment?: string,
+	ctMaskedAmount?: string,
+	ctBlinding?: string,
+	ring_amount?: any
 };
 
 type TxExtra = {
@@ -142,6 +146,23 @@ export class TransactionsExplorer {
 		let inputs: CnTransactions.Vin[] = [];
 
 		for (let rawVin of rawTransaction.vin) {
+			if (rawVin.type === '04' || rawVin.type === 'confidential_input' || rawVin.type === 'input_to_confidential') {
+				if (typeof rawVin.value === 'undefined' || typeof rawVin.value.k_image !== 'string') {
+					return null;
+				}
+				let value : any = rawVin.value;
+				inputs.push({
+					type: 'confidential_input',
+					ring_amount: '' + (value.ring_amount || value.ringAmount || CnTransactions.ctConfidentialOutputAmount()),
+					ring_offsets: (value.ring_offsets || value.ringOutputIndexes || []).slice(),
+					ring_pubkeys: (value.ring_pubkeys || value.ringPubkeys || []).slice(),
+					ring_commits: (value.ring_commits || value.ringCommitments || []).slice(),
+					pseudo_commit: value.pseudo_commit || value.pseudoCommitment || '',
+					k_image: value.k_image
+				});
+				continue;
+			}
+
 			if (rawVin.type !== '02' && rawVin.type !== 'input_to_key') {
 				return null;
 			}
@@ -251,10 +272,14 @@ export class TransactionsExplorer {
 
 		let outs: TransactionOut[] = [];
 		let ins: TransactionIn[] = [];
+		let isCtTx = rawTransaction.version === 2;
 
 		for (let iOut = 0; iOut < rawTransaction.vout.length; iOut++) {
 			let out = rawTransaction.vout[iOut];
-			let txout_k = out.target.data;
+			let txout_k : any = out.target.data || <any>out.target || {};
+			let outKey = txout_k.key || txout_k.target_key || txout_k.targetKey;
+			let outCommitment = txout_k.commitment || txout_k.commit || '';
+			let outMaskedAmount = txout_k.masked_amount || txout_k.maskedAmount || '';
 			let amount: number = 0;
 			try {
 				amount = out.amount;
@@ -268,9 +293,20 @@ export class TransactionsExplorer {
 			let generated_tx_pubkey = CnNativeBride.derive_public_key(derivation, output_idx_in_tx, wallet.keys.pub.spend);
 
 			// check if generated public key matches the current output's key
-			let mine_output = (txout_k.key == generated_tx_pubkey);
+			let mine_output = (outKey == generated_tx_pubkey);
 
 			if (mine_output) {
+				let ctBlinding = '';
+				if (isCtTx) {
+					if (outMaskedAmount === '' || outCommitment === '') {
+						console.warn('Skipping CT output with missing commitment or masked amount', rawTransaction.hash, iOut);
+						continue;
+					}
+					let decodedCt = CnTransactions.decode_ct_amount(outMaskedAmount, outCommitment, derivation, output_idx_in_tx);
+					amount = decodedCt.amount.toJSValue();
+					ctBlinding = decodedCt.blinding;
+				}
+
 				let transactionOut = new TransactionOut();
 				if (typeof rawTransaction.global_index_start !== 'undefined')
 					transactionOut.globalIndex = rawTransaction.output_indexes[output_idx_in_tx];
@@ -278,8 +314,14 @@ export class TransactionsExplorer {
 					transactionOut.globalIndex = output_idx_in_tx;
 
 				transactionOut.amount = amount;
-				transactionOut.pubKey = txout_k.key;
+				transactionOut.pubKey = outKey;
 				transactionOut.outputIdx = output_idx_in_tx;
+				if (isCtTx) {
+					transactionOut.ctCommitment = outCommitment;
+					transactionOut.ctMaskedAmount = outMaskedAmount;
+					transactionOut.ctBlinding = ctBlinding;
+					transactionOut.ctRingAmount = CnTransactions.ctConfidentialOutputAmount();
+				}
 				/*
 				if (!minerTx) {
 					transactionOut.rtcOutPk = rawTransaction.rct_signatures.outPk[output_idx_in_tx];
@@ -335,9 +377,11 @@ export class TransactionsExplorer {
 
 				if (!vin.value) continue;
 
-				let absoluteOffets = vin.value.key_offsets.slice();
+				let vinValue : any = vin.value;
+				let relativeOffsets = (vinValue.key_offsets || vinValue.ring_offsets || vinValue.ringOutputIndexes || []);
+				let absoluteOffets = relativeOffsets.map(function(offset:any) { return new JSBigInt(offset).toJSValue(); });
 				for (let i = 1; i < absoluteOffets.length; ++i) {
-					absoluteOffets[i] += absoluteOffets[i - 1];
+					absoluteOffets[i] = new JSBigInt(absoluteOffets[i]).add(absoluteOffets[i - 1]).toJSValue();
 				}
 
 				let ownTx = -1;
@@ -438,7 +482,11 @@ export class TransactionsExplorer {
 					public_key: out.pubKey,
 					index: out.outputIdx,
 					global_index: out.globalIndex,
-					tx_pub_key: tr.txPubKey
+					tx_pub_key: tr.txPubKey,
+					ctCommitment: out.ctCommitment,
+					ctMaskedAmount: out.ctMaskedAmount,
+					ctBlinding: out.ctBlinding,
+					ring_amount: out.ctRingAmount || (out.ctCommitment !== '' ? CnTransactions.ctConfidentialOutputAmount() : out.amount)
 				});
 			}
 		}
@@ -513,14 +561,18 @@ export class TransactionsExplorer {
 		userPaymentId: string = '',
 		wallet: Wallet,
 		blockchainHeight: number,
-		obtainMixOutsCallback: (amounts: number[], numberOuts: number) => Promise<RawDaemon_Out[]>,
+		obtainMixOutsCallback: (amounts: any[], numberOuts: number) => Promise<RawDaemon_Out[]>,
 		confirmCallback: (amount: number, feesAmount: number) => Promise<void>,
 		mixin: number = config.defaultMixin,
 		accountRegistration: boolean = false):
 		Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }> {
 		return new Promise<{ raw: { hash: string, prvkey: string, raw: string }, signed: any }>(function (resolve, reject) {
 
+			let useCt = true;
 			let neededFee = new JSBigInt((<any>window).config.coinFee);
+			if (useCt && neededFee.compare(CnTransactions.ctMinimumDenomination()) < 0) {
+				neededFee = CnTransactions.ctMinimumDenomination();
+			}
 
 			let pid_encrypt = false; //don't encrypt payment ID unless we find an integrated one
 
@@ -543,6 +595,16 @@ export class TransactionsExplorer {
 					address: dest.address,
 					amount: new JSBigInt(dest.amount)
 				});
+			}
+
+			if (useCt) {
+				for (let dest of dsts) {
+					let amount = new JSBigInt(dest.amount);
+					if (amount.compare(0) <= 0 || amount.remainder(CnTransactions.ctMinimumDenomination()).compare(0) !== 0) {
+						reject('ct_wrong_amount');
+						return;
+					}
+				}
 			}
 
 			if (paymentIdIncluded > 1) {
@@ -617,13 +679,22 @@ export class TransactionsExplorer {
 					return;
 				} else if (usingOuts_amount.compare(totalAmount) > 0) {
 					let changeAmount = usingOuts_amount.subtract(totalAmount);
-					//add entire change for rct
-					console.log("1) Sending change of " + Cn.formatMoneySymbol(changeAmount)
-						+ " to " + wallet.getPublicAddress());
-					dsts.push({
-						address: wallet.getPublicAddress(),
-						amount: changeAmount
-					});
+					let changeCanonical = changeAmount;
+					if (useCt) {
+						changeCanonical = changeAmount.divide(CnTransactions.ctMinimumDenomination()).multiply(CnTransactions.ctMinimumDenomination());
+						let residue = changeAmount.subtract(changeCanonical);
+						if (residue.compare(0) > 0) {
+							neededFee = neededFee.add(residue);
+						}
+					}
+					if (changeCanonical.compare(0) > 0) {
+						console.log("1) Sending change of " + Cn.formatMoneySymbol(changeCanonical)
+							+ " to " + wallet.getPublicAddress());
+						dsts.push({
+							address: wallet.getPublicAddress(),
+							amount: changeCanonical
+						});
+					}
 				} /*
 				// not applicable for Karbo
 				else if (usingOuts_amount.compare(totalAmount) === 0) {
@@ -637,9 +708,9 @@ export class TransactionsExplorer {
 				}*/
 				console.log('destinations', dsts);
 
-				let amounts: number[] = [];
+				let amounts: any[] = [];
 				for (let l = 0; l < usingOuts.length; l++) {
-					amounts.push(usingOuts[l].amount);
+					amounts.push(usingOuts[l].ring_amount || (usingOuts[l].ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : usingOuts[l].amount));
 				}
 
 				let nbOutsNeeded: number = mixin + 1;
@@ -649,7 +720,7 @@ export class TransactionsExplorer {
 					console.log('amounts', amounts);
 					console.log('lots_mix_outs', lotsMixOuts);
 
-					TransactionsExplorer.createRawTx(dsts, wallet, false, usingOuts, pid_encrypt, lotsMixOuts, mixin, neededFee, paymentId, accountRegistration).then(function (data: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
+					TransactionsExplorer.createRawTx(dsts, wallet, useCt, usingOuts, pid_encrypt, lotsMixOuts, mixin, neededFee, paymentId, accountRegistration).then(function (data: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
 						resolve(data);
 					}).catch(function (e) {
 						reject(e);

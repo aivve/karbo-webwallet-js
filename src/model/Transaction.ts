@@ -42,6 +42,10 @@ export class TransactionOut {
     rtcOutPk: string = '';
     rtcMask: string = '';
     rtcAmount: string = '';
+    ctCommitment: string = '';
+    ctMaskedAmount: string = '';
+    ctBlinding: string = '';
+    ctRingAmount: string = '';
 
     static fromRaw(raw: any) {
         let nout = new TransactionOut();
@@ -55,6 +59,10 @@ export class TransactionOut {
         if (typeof raw.rtcOutPk !== 'undefined') nout.rtcOutPk = raw.rtcOutPk;
         if (typeof raw.rtcMask !== 'undefined') nout.rtcMask = raw.rtcMask;
         if (typeof raw.rtcAmount !== 'undefined') nout.rtcAmount = raw.rtcAmount;
+        if (typeof raw.ctCommitment !== 'undefined') nout.ctCommitment = raw.ctCommitment;
+        if (typeof raw.ctMaskedAmount !== 'undefined') nout.ctMaskedAmount = raw.ctMaskedAmount;
+        if (typeof raw.ctBlinding !== 'undefined') nout.ctBlinding = raw.ctBlinding;
+        if (typeof raw.ctRingAmount !== 'undefined') nout.ctRingAmount = raw.ctRingAmount;
 
         return nout;
     }
@@ -69,6 +77,10 @@ export class TransactionOut {
         if (this.rtcOutPk !== '') data.rtcOutPk = this.rtcOutPk;
         if (this.rtcMask !== '') data.rtcMask = this.rtcMask;
         if (this.rtcAmount !== '') data.rtcAmount = this.rtcAmount;
+        if (this.ctCommitment !== '') data.ctCommitment = this.ctCommitment;
+        if (this.ctMaskedAmount !== '') data.ctMaskedAmount = this.ctMaskedAmount;
+        if (this.ctBlinding !== '') data.ctBlinding = this.ctBlinding;
+        if (this.ctRingAmount !== '') data.ctRingAmount = this.ctRingAmount;
         if (this.ephemeralPub !== '') data.ephemeralPub = this.ephemeralPub;
         if (this.pubKey !== '') data.pubKey = this.pubKey;
 

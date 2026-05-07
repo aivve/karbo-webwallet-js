@@ -189,7 +189,7 @@ class AccountView extends DestructableView{
 					'',
 					wallet,
 					blockchainHeight,
-					function (amounts: number[], numberOuts: number): Promise<RawDaemon_Out[]> {
+					function (amounts: any[], numberOuts: number): Promise<RawDaemon_Out[]> {
 						return blockchainExplorer.getRandomOuts(amounts, numberOuts);
 					},
 					function (amount: number, feesAmount: number): Promise<void> {

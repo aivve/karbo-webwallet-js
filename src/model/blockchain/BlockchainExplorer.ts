@@ -54,7 +54,11 @@ export type RemoteNodeInformation = {
 
 export type RawDaemon_Out = {
     global_index: number, 
-    public_key: string
+    public_key: string,
+    commitment?: string,
+    ctCommitment?: string,
+    ct_commitment?: string,
+    ring_amount?: string
 }
 
 
@@ -73,7 +77,7 @@ export interface BlockchainExplorer {
 
     sendRawTx(rawTx: string): Promise<any>;
 
-    getRandomOuts(amounts: number[], nbOutsNeeded: number): Promise<RawDaemon_Out[]>;
+    getRandomOuts(amounts: any[], nbOutsNeeded: number): Promise<RawDaemon_Out[]>;
 
     getNetworkInfo(): Promise<NetworkInfo>;
 

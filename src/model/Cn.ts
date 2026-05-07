@@ -51,8 +51,21 @@ if (config.testnet === true)
 	CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = config.subAddressPrefixTestnet;
 }
 let UINT64_MAX = new JSBigInt(2).pow(64);
-let CURRENT_TX_VERSION = 1;
+let CURRENT_TX_VERSION = 2;
 let OLD_TX_VERSION = 1;
+let TRANSACTION_VERSION_CT = 2;
+let CT_CONFIDENTIAL_OUTPUT_AMOUNT = "18446744073709551615";
+let CT_MIN_DENOMINATION = new JSBigInt("10000000000");
+let CT_DENOMINATIONS = [
+	"10000000000", "20000000000", "30000000000", "40000000000", "50000000000", "60000000000", "70000000000", "80000000000", "90000000000",
+	"100000000000", "200000000000", "300000000000", "400000000000", "500000000000", "600000000000", "700000000000", "800000000000", "900000000000",
+	"1000000000000", "2000000000000", "3000000000000", "4000000000000", "5000000000000", "6000000000000", "7000000000000", "8000000000000", "9000000000000",
+	"10000000000000", "20000000000000", "30000000000000", "40000000000000", "50000000000000", "60000000000000", "70000000000000", "80000000000000", "90000000000000",
+	"100000000000000", "200000000000000", "300000000000000", "400000000000000", "500000000000000", "600000000000000", "700000000000000", "800000000000000", "900000000000000",
+	"1000000000000000", "2000000000000000", "3000000000000000", "4000000000000000", "5000000000000000", "6000000000000000", "7000000000000000", "8000000000000000", "9000000000000000",
+	"10000000000000000", "20000000000000000", "30000000000000000", "40000000000000000", "50000000000000000", "60000000000000000", "70000000000000000", "80000000000000000", "90000000000000000",
+	"100000000000000000"
+];
 let TX_EXTRA_NONCE_MAX_COUNT = 255;
 let TX_EXTRA_TAGS = {
 	PADDING: '00',
@@ -213,6 +226,45 @@ export namespace CnUtils{
 			return CnUtils.swapEndian(CnUtils.d2h(integer.toString()));
 		}
 
+	}
+
+	export function scalar_to_bigint(scalar : string) {
+		if (scalar.length !== 64 || !CnUtils.valid_hex(scalar)) {
+			throw "Invalid scalar";
+		}
+		return JSBigInt.parse(CnUtils.swapEndian(scalar), 16);
+	}
+
+	export function bigint_to_scalar(integer : any) {
+		let reduced = new JSBigInt(integer).remainder(CnVars.l);
+		if (reduced.compare(0) < 0) {
+			reduced = reduced.add(CnVars.l);
+		}
+		return CnUtils.swapEndian(CnUtils.padLeft(reduced.toString(16).toLowerCase(), 64, "0"));
+	}
+
+	export function u64_to_le_hex(integer : number|string|any) {
+		let n = new JSBigInt(integer);
+		if (n.compare(0) < 0 || n.compare(UINT64_MAX) >= 0) {
+			throw "amount overflows uint64";
+		}
+		let out = "";
+		for (let i = 0; i < 8; ++i) {
+			out += ("0" + n.remainder(256).toJSValue().toString(16)).slice(-2);
+			n = n.divide(256);
+		}
+		return out;
+	}
+
+	export function le_hex_to_u64(hex : string) {
+		if (hex.length !== 16 || !CnUtils.valid_hex(hex)) {
+			throw "Invalid uint64 hex";
+		}
+		let out = JSBigInt.ZERO;
+		for (let i = 7; i >= 0; --i) {
+			out = out.multiply(256).add(parseInt(hex.slice(i * 2, i * 2 + 2), 16));
+		}
+		return out;
 	}
 
 	// hexadecimal to integer
@@ -481,6 +533,30 @@ export namespace CnNativeBride{
 		return CnUtils.bintohex(res);
 	}
 
+	export function hash_to_ec_2_data(data : string) {
+		if (data.length % 2 !== 0 || !CnUtils.valid_hex(data)) {
+			throw "Invalid input";
+		}
+		let h_m = Module._malloc(HASH_SIZE);
+		let point_m = Module._malloc(STRUCT_SIZES.GE_P2);
+		let point2_m = Module._malloc(STRUCT_SIZES.GE_P1P1);
+		let res_m = Module._malloc(STRUCT_SIZES.GE_P3);
+		let res2_m = Module._malloc(KEY_SIZE);
+		let hash = CnUtils.hextobin(CnUtils.cn_fast_hash(data));
+		Module.HEAPU8.set(hash, h_m);
+		Module.ccall("ge_fromfe_frombytes_vartime", "void", ["number", "number"], [point_m, h_m]);
+		Module.ccall("ge_mul8", "void", ["number", "number"], [point2_m, point_m]);
+		Module.ccall("ge_p1p1_to_p3", "void", ["number", "number"], [res_m, point2_m]);
+		Module.ccall("ge_p3_tobytes", "void", ["number", "number"], [res2_m, res_m]);
+		let res = Module.HEAPU8.subarray(res2_m, res2_m + KEY_SIZE);
+		Module._free(h_m);
+		Module._free(point_m);
+		Module._free(point2_m);
+		Module._free(res_m);
+		Module._free(res2_m);
+		return CnUtils.bintohex(res);
+	}
+
 	export function generate_key_image_2(pub : string, sec : string) {
 		if (!pub || !sec || pub.length !== 64 || sec.length !== 64) {
 			throw "Invalid input length";
@@ -542,6 +618,17 @@ export namespace CnNativeBride{
 		Module._free(scalar2_m);
 		Module._free(derived_m);
 		return CnUtils.bintohex(res);
+	}
+
+	export function sc_mul(scalar1 : string, scalar2 : string) {
+		if (scalar1.length !== 64 || scalar2.length !== 64 || !CnUtils.valid_hex(scalar1) || !CnUtils.valid_hex(scalar2)) {
+			throw "Invalid input length!";
+		}
+		return CnUtils.bigint_to_scalar(CnUtils.scalar_to_bigint(scalar1).multiply(CnUtils.scalar_to_bigint(scalar2)));
+	}
+
+	export function sc_muladd(scalar1 : string, scalar2 : string, scalar3 : string) {
+		return CnNativeBride.sc_add(CnNativeBride.sc_mul(scalar1, scalar2), scalar3);
 	}
 
 	//res = c - (ab) mod l; argument names copied from the signature implementation
@@ -958,11 +1045,48 @@ export namespace Cn{
 
 export namespace CnTransactions{
 
+	let pedersenHCache : string | null = null;
+
+	export function ctConfidentialOutputAmount() {
+		return CT_CONFIDENTIAL_OUTPUT_AMOUNT;
+	}
+
+	export function ctMinimumDenomination() {
+		return CT_MIN_DENOMINATION;
+	}
+
+	export function ctDenominations() {
+		return CT_DENOMINATIONS.slice();
+	}
+
+	export function pedersenH() {
+		if (pedersenHCache === null) {
+			pedersenHCache = CnNativeBride.hash_to_ec_2_data(CnUtils.bintohex("CN-amount-generator"));
+		}
+		return pedersenHCache;
+	}
+
+	export function scalar_one() {
+		return CnUtils.d2s(1);
+	}
+
+	export function sc_neg(scalar : string) {
+		return CnNativeBride.sc_sub(CnVars.Z, scalar);
+	}
+
+	export function point_sum(points : string[]) {
+		let sum = CnVars.I;
+		for (let point of points) {
+			sum = CnUtils.ge_add(sum, point);
+		}
+		return sum;
+	}
+
 	export function commit(amount : string, mask : string){
 		if (!CnUtils.valid_hex(mask) || mask.length !== 64 || !CnUtils.valid_hex(amount) || amount.length !== 64){
 			throw "invalid amount or mask!";
 		}
-		let C = CnUtils.ge_double_scalarmult_base_vartime(amount, CnVars.H, mask);
+		let C = CnUtils.ge_double_scalarmult_base_vartime(amount, CnTransactions.pedersenH(), mask);
 		return C;
 	}
 
@@ -970,8 +1094,39 @@ export namespace CnTransactions{
 		if (!CnUtils.valid_hex(amount) || amount.length !== 64){
 			throw "invalid amount!";
 		}
-		let C = CnUtils.ge_double_scalarmult_base_vartime(amount, CnVars.H, CnVars.I);
+		let C = CnUtils.ge_double_scalarmult_base_vartime(amount, CnTransactions.pedersenH(), CnVars.Z);
 		return C;
+	}
+
+	export function mask_amount(sharedSecret : string, amount : number|string|any) {
+		if (sharedSecret.length !== 64 || !CnUtils.valid_hex(sharedSecret)) {
+			throw "Invalid shared secret";
+		}
+		let amountLe = CnUtils.u64_to_le_hex(amount);
+		let mask = Cn.hash_to_scalar(sharedSecret + "00").slice(0, 16);
+		return CnUtils.hex_xor(amountLe, mask);
+	}
+
+	export function unmask_amount(sharedSecret : string, maskedAmount : string) {
+		if (sharedSecret.length !== 64 || maskedAmount.length !== 16 || !CnUtils.valid_hex(maskedAmount)) {
+			throw "Invalid CT amount mask";
+		}
+		let mask = Cn.hash_to_scalar(sharedSecret + "00").slice(0, 16);
+		return CnUtils.le_hex_to_u64(CnUtils.hex_xor(maskedAmount, mask));
+	}
+
+	export function decode_ct_amount(maskedAmount : string, commitment : string, derivation : string, outIndex : number) {
+		let amount = CnTransactions.unmask_amount(derivation, maskedAmount);
+		let blinding = CnUtils.derivation_to_scalar(derivation, outIndex);
+		let expectedCommitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
+		if (commitment && expectedCommitment !== commitment) {
+			throw "CT output commitment mismatch";
+		}
+		return {
+			amount: amount,
+			blinding: blinding,
+			commitment: expectedCommitment
+		};
 	}
 
 	export function decodeRctSimple(rv : any, sk  :any, i : number, mask : any, hwdev : any=null) {
@@ -1148,10 +1303,17 @@ export namespace CnTransactions{
 		let out = [];
 		if (rct) {
 			for (let i = 0; i < dsts.length; i++) {
-				out.push({
-					address: dsts[i].address,
-					amount: dsts[i].amount
-				});
+				let amount = new JSBigInt(dsts[i].amount);
+				if (amount.compare(0) === 0) {
+					continue;
+				}
+				let denominations = CnTransactions.decompose_ct_amount(amount);
+				for (let denom of denominations) {
+					out.push({
+						address: dsts[i].address,
+						amount: denom
+					});
+				}
 			}
 		} else {
 			for (let i = 0; i < dsts.length; i++) {
@@ -1167,8 +1329,37 @@ export namespace CnTransactions{
 			}
 		}
 		return out.sort(function(a,b){
-			return a["amount"] - b["amount"];
+			return new JSBigInt(a["amount"]).compare(b["amount"]);
 		});
+	}
+
+	export function decompose_ct_amount(amount : any) {
+		let remaining = new JSBigInt(amount);
+		if (remaining.compare(0) <= 0) {
+			throw "Cannot decompose zero CT amount";
+		}
+		let out = [];
+		for (let i = CT_DENOMINATIONS.length - 1; i >= 0 && remaining.compare(0) > 0; --i) {
+			let denom = new JSBigInt(CT_DENOMINATIONS[i]);
+			while (remaining.compare(denom) >= 0) {
+				out.push(denom);
+				remaining = remaining.subtract(denom);
+			}
+		}
+		if (remaining.compare(0) !== 0) {
+			throw "Confidential transactions require amounts to be a multiple of " + CT_MIN_DENOMINATION.toString();
+		}
+		return out;
+	}
+
+	export function denomination_index(amount : any) {
+		let amt = new JSBigInt(amount).toString();
+		for (let i = 0; i < CT_DENOMINATIONS.length; ++i) {
+			if (CT_DENOMINATIONS[i] === amt) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	export function get_payment_id_nonce(payment_id : string, pid_encrypt : boolean) {
@@ -1185,7 +1376,7 @@ export namespace CnTransactions{
 		return res;
 	}
 
-	export function abs_to_rel_offsets(offsets : number[]) {
+	export function abs_to_rel_offsets(offsets : any[]) {
 		if (offsets.length === 0) return offsets;
 		for (let i = offsets.length - 1; i >= 1; --i) {
 			offsets[i] = new JSBigInt(offsets[i]).subtract(offsets[i - 1]).toString();
@@ -1255,7 +1446,8 @@ export namespace CnTransactions{
 
 	export type Source = {
 		outputs:CnTransactions.Output[],
-		amount:'',
+		amount:any,
+		ring_amount?:any,
 		real_out_tx_key:string,
 		real_out:number,
 		real_out_in_tx:number,
@@ -1268,9 +1460,14 @@ export namespace CnTransactions{
 
 	export type Vin = {
 		type:string,
-		amount:string,
+		amount?:string,
 		k_image:string,
-		key_offsets:any[]
+		key_offsets?:any[],
+		ring_amount?:string,
+		ring_offsets?:any[],
+		ring_pubkeys?:string[],
+		ring_commits?:string[],
+		pseudo_commit?:string
 	};
 
 	export type Vout = {
@@ -1278,9 +1475,34 @@ export namespace CnTransactions{
 		target:{
 			type: string,
 			data: {
-				key: string
+				key?: string,
+				target_key?: string,
+				commitment?: string,
+				masked_amount?: string
 			}
 		}
+	};
+
+	export type CTInputSignature = {
+		c0:string,
+		ss:string[][]
+	};
+
+	export type CTOutputProof = {
+		I:string[],
+		A:string[],
+		B:string[],
+		Q:string[],
+		z:string[],
+		za:string[],
+		zb:string[],
+		f:string
+	};
+
+	export type TransactionKernel = {
+		excessCommitment:string,
+		sigE:string,
+		sigS:string
 	};
 
 	export type EcdhInfo = {
@@ -1346,78 +1568,147 @@ export namespace CnTransactions{
 		vin: Vin[],
 		vout: Vout[],
 		rct_signatures:RctSignature,
+		ct_signatures?:CTInputSignature[],
+		ct_proofs?:CTOutputProof[],
+		kernel?:TransactionKernel,
+		fee?:any,
 		signatures:any[],
 	};
 
+	export function serialize_input(input : Vin) {
+		let buf = "";
+		switch (input.type) {
+			case "input_to_key":
+				buf += "02";
+				buf += CnUtils.encode_varint(input.amount || "0");
+				buf += CnUtils.encode_varint((input.key_offsets || []).length);
+				for (let offset of (input.key_offsets || [])) {
+					buf += CnUtils.encode_varint(offset);
+				}
+				buf += input.k_image;
+				break;
+			case "confidential_input":
+			case "input_to_confidential":
+				buf += "04";
+				buf += CnUtils.encode_varint(input.ring_amount || input.amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT);
+				buf += CnUtils.encode_varint((input.ring_offsets || input.key_offsets || []).length);
+				for (let offset of (input.ring_offsets || input.key_offsets || [])) {
+					buf += CnUtils.encode_varint(offset);
+				}
+				buf += CnUtils.encode_varint((input.ring_pubkeys || []).length);
+				for (let pubkey of (input.ring_pubkeys || [])) {
+					buf += pubkey;
+				}
+				buf += CnUtils.encode_varint((input.ring_commits || []).length);
+				for (let commit of (input.ring_commits || [])) {
+					buf += commit;
+				}
+				buf += input.pseudo_commit || "";
+				buf += input.k_image;
+				break;
+			default:
+				throw "Unhandled vin type: " + input.type;
+		}
+		return buf;
+	}
+
+	export function serialize_output(vout : Vout) {
+		let buf = "";
+		buf += CnUtils.encode_varint(vout.amount);
+		switch (vout.target.type) {
+			case "txout_to_key":
+				buf += "02";
+				buf += vout.target.data.key;
+				break;
+			case "txout_to_confidential":
+			case "txout_to_confidential_key":
+				buf += "04";
+				buf += vout.target.data.target_key || vout.target.data.key || "";
+				buf += vout.target.data.commitment || "";
+				buf += vout.target.data.masked_amount || "";
+				break;
+			default:
+				throw "Unhandled txout target type: " + vout.target.type;
+		}
+		return buf;
+	}
+
+	export function serialize_ct_body(tx : CnTransactions.Transaction) {
+		let buf = "";
+		let signatures = tx.ct_signatures || [];
+		buf += CnUtils.encode_varint(signatures.length);
+		for (let sig of signatures) {
+			buf += sig.c0;
+			buf += CnUtils.encode_varint(sig.ss.length);
+			for (let row of sig.ss) {
+				buf += row[0];
+				buf += row[1];
+			}
+		}
+
+		let proofs = tx.ct_proofs || [];
+		buf += CnUtils.encode_varint(proofs.length);
+		for (let proof of proofs) {
+			for (let field of ["I", "A", "B", "Q", "z", "za", "zb"]) {
+				let values = (<any>proof)[field] || [];
+				if (values.length !== 6) {
+					throw "Invalid CT proof field length";
+				}
+				for (let value of values) {
+					buf += value;
+				}
+			}
+			buf += proof.f;
+		}
+
+		if (!tx.kernel) {
+			throw "Missing CT transaction kernel";
+		}
+		buf += tx.kernel.excessCommitment;
+		buf += tx.kernel.sigE;
+		buf += tx.kernel.sigS;
+		return buf;
+	}
+
 	export function serialize_tx(tx : CnTransactions.Transaction, headeronly : boolean = false) {
-		//tx: {
-		//  version: uint64,
-		//  unlock_time: uint64,
-		//  extra: hex,
-		//  vin: [{amount: uint64, k_image: hex, key_offsets: [uint64,..]},...],
-		//  vout: [{amount: uint64, target: {key: hex}},...],
-		//  signatures: [[s,s,...],...]
-		//}
-		console.log('serialize tx ', JSON.parse(JSON.stringify(tx)));
 		let buf = "";
 		buf += CnUtils.encode_varint(tx.version);
-		buf += CnUtils.encode_varint(tx.unlock_time);
+		if (tx.version === TRANSACTION_VERSION_CT) {
+			buf += CnUtils.encode_varint(tx.fee || 0);
+		} else {
+			buf += CnUtils.encode_varint(tx.unlock_time);
+		}
+
 		buf += CnUtils.encode_varint(tx.vin.length);
-		let i, j;
-		for (i = 0; i < tx.vin.length; i++) {
-			let vin = tx.vin[i];
-			console.log('start vin', vin);
-			switch (vin.type) {
-				case "input_to_key":
-					buf += "02";
-					buf += CnUtils.encode_varint(vin.amount);
-					buf += CnUtils.encode_varint(vin.key_offsets.length);
-					console.log(vin.key_offsets,vin.key_offsets.length);
-					for (j = 0; j < vin.key_offsets.length; j++) {
-						console.log(j, vin.key_offsets[j]);
-						buf += CnUtils.encode_varint(vin.key_offsets[j]);
-					}
-					buf += vin.k_image;
-					break;
-				default:
-					throw "Unhandled vin type: " + vin.type;
-			}
-			console.log('end vin', vin);
+		for (let input of tx.vin) {
+			buf += CnTransactions.serialize_input(input);
 		}
-		console.log('serialize tx ', tx);
+
 		buf += CnUtils.encode_varint(tx.vout.length);
-		for (i = 0; i < tx.vout.length; i++) {
-			let vout = tx.vout[i];
-			buf += CnUtils.encode_varint(vout.amount);
-			switch (vout.target.type) {
-				case "txout_to_key":
-					buf += "02";
-					buf += vout.target.data.key;
-					break;
-				default:
-					throw "Unhandled txout target type: " + vout.target.type;
-			}
+		for (let output of tx.vout) {
+			buf += CnTransactions.serialize_output(output);
 		}
-		console.log('serialize tx ', tx);
 
 		if (!CnUtils.valid_hex(tx.extra)) {
 			throw "Tx extra has invalid hex";
 		}
-		console.log('serialize tx ', tx);
-
 		buf += CnUtils.encode_varint(tx.extra.length / 2);
 		buf += tx.extra;
+
 		if (!headeronly) {
-			if (tx.vin.length !== tx.signatures.length) {
-				throw "Signatures length != vin length";
-			}
-			for (i = 0; i < tx.vin.length; i++) {
-				for (j = 0; j < tx.signatures[i].length; j++) {
-					buf += tx.signatures[i][j];
+			if (tx.version === TRANSACTION_VERSION_CT) {
+				buf += CnTransactions.serialize_ct_body(tx);
+			} else {
+				if (tx.vin.length !== tx.signatures.length) {
+					throw "Signatures length != vin length";
+				}
+				for (let i = 0; i < tx.vin.length; i++) {
+					for (let j = 0; j < tx.signatures[i].length; j++) {
+						buf += tx.signatures[i][j];
+					}
 				}
 			}
 		}
-		console.log('serialize tx ', buf);
 		return buf;
 	}
 
@@ -1474,20 +1765,7 @@ export namespace CnTransactions{
 		buf += CnUtils.encode_varint(vin.length);
 
 		for (let i = 0; i < vin.length; ++i) {
-			let input = vin[i];
-			switch (input.type) {
-				case "input_to_key":
-					buf += "02";
-					buf += CnUtils.encode_varint(input.amount);
-					buf += CnUtils.encode_varint(input.key_offsets.length);
-					for (let j = 0; j < input.key_offsets.length; ++j) {
-						buf += CnUtils.encode_varint(input.key_offsets[j]);
-					}
-					buf += input.k_image;
-					break;
-				default:
-					throw "Unhandled vin type: " + input.type;
-			}
+			buf += CnTransactions.serialize_input(vin[i]);
 		}
 
 		return buf;
@@ -1508,6 +1786,233 @@ export namespace CnTransactions{
 		return {
 			sec: txSecretKey,
 			pub: CnUtils.sec_key_to_pub(txSecretKey)
+		};
+	}
+
+	export function is_zero_scalar(scalar : string) {
+		return scalar === CnVars.Z;
+	}
+
+	export function add_scalar_mult(point : string, scalar : string, sum : string) {
+		if (CnTransactions.is_zero_scalar(scalar)) {
+			return sum;
+		}
+		return CnUtils.ge_add(sum, CnUtils.ge_scalarmult(point, scalar));
+	}
+
+	export function gk_compute_derived_ring(commitment : string) {
+		let ring : string[] = [];
+		let H = CnTransactions.pedersenH();
+		for (let k = 0; k < CT_DENOMINATIONS.length; ++k) {
+			let denomH = CnUtils.ge_scalarmult(H, CnUtils.d2s(CT_DENOMINATIONS[k]));
+			ring.push(CnUtils.ge_sub(commitment, denomH));
+		}
+		return ring;
+	}
+
+	export function gk_compute_poly_coeffs(bits : number[], a : string[]) {
+		let coeffs : string[][] = [];
+		let zero = CnVars.Z;
+		let one = CnTransactions.scalar_one();
+
+		for (let k = 0; k < CT_DENOMINATIONS.length; ++k) {
+			let poly = [one, zero, zero, zero, zero, zero, zero];
+			let currentDegree = 0;
+
+			for (let j = 0; j < 6; ++j) {
+				let kBit = (k >> j) & 1;
+				let lBit = bits[j];
+				let factorConst = zero;
+				let factorLinear = zero;
+
+				if (kBit === 1) {
+					factorConst = a[j];
+					factorLinear = lBit ? one : zero;
+				} else {
+					factorConst = CnTransactions.sc_neg(a[j]);
+					factorLinear = lBit ? zero : one;
+				}
+
+				let newPoly = [zero, zero, zero, zero, zero, zero, zero];
+				for (let i = 0; i <= currentDegree + 1; ++i) {
+					let term1 = CnNativeBride.sc_mul(factorConst, poly[i]);
+					if (i > 0) {
+						let term2 = CnNativeBride.sc_mul(factorLinear, poly[i - 1]);
+						newPoly[i] = CnNativeBride.sc_add(term1, term2);
+					} else {
+						newPoly[i] = term1;
+					}
+				}
+				currentDegree++;
+				poly = newPoly;
+			}
+
+			coeffs[k] = poly;
+		}
+		return coeffs;
+	}
+
+	export function gk_challenge(txHash : string, D : string[], I : string[], A : string[], B : string[], Q : string[]) {
+		return Cn.hash_to_scalar(
+			CnUtils.bintohex("GK-KarboCT-v2") +
+			D.join("") +
+			I.join("") +
+			A.join("") +
+			B.join("") +
+			Q.join("") +
+			txHash
+		);
+	}
+
+	export function gk_prove(commitment : string, amount : any, blinding : string, txHash : string) : CTOutputProof {
+		let denominationIndex = CnTransactions.denomination_index(amount);
+		if (denominationIndex < 0) {
+			throw "Amount is not a canonical CT denomination";
+		}
+
+		let D = CnTransactions.gk_compute_derived_ring(commitment);
+		let H = CnTransactions.pedersenH();
+		let bits : number[] = [];
+		for (let j = 0; j < 6; ++j) {
+			bits[j] = (denominationIndex >> j) & 1;
+		}
+
+		let rj : string[] = [];
+		let a : string[] = [];
+		let s : string[] = [];
+		let t : string[] = [];
+		for (let j = 0; j < 6; ++j) {
+			rj[j] = CnRandom.random_scalar();
+			a[j] = CnRandom.random_scalar();
+			s[j] = CnRandom.random_scalar();
+			t[j] = CnRandom.random_scalar();
+		}
+
+		let I : string[] = [];
+		let A : string[] = [];
+		let B : string[] = [];
+		for (let j = 0; j < 6; ++j) {
+			let rG = CnUtils.ge_scalarmult_base(rj[j]);
+			I[j] = bits[j] ? CnUtils.ge_add(rG, H) : rG;
+
+			let sG = CnUtils.ge_scalarmult_base(s[j]);
+			let aH = CnUtils.ge_scalarmult(H, a[j]);
+			A[j] = CnUtils.ge_add(sG, aH);
+
+			let tG = CnUtils.ge_scalarmult_base(t[j]);
+			B[j] = bits[j] ? CnUtils.ge_add(tG, aH) : tG;
+		}
+
+		let polyCoeffs = CnTransactions.gk_compute_poly_coeffs(bits, a);
+		let rho : string[] = [];
+		let Q : string[] = [];
+		for (let m = 0; m < 6; ++m) {
+			rho[m] = CnRandom.random_scalar();
+			let sum = CnUtils.ge_scalarmult_base(rho[m]);
+			for (let k = 0; k < CT_DENOMINATIONS.length; ++k) {
+				sum = CnTransactions.add_scalar_mult(D[k], polyCoeffs[k][m], sum);
+			}
+			Q[m] = sum;
+		}
+
+		let x = CnTransactions.gk_challenge(txHash, D, I, A, B, Q);
+		let z : string[] = [];
+		let za : string[] = [];
+		let zb : string[] = [];
+		for (let j = 0; j < 6; ++j) {
+			z[j] = bits[j] ? CnNativeBride.sc_add(x, a[j]) : a[j];
+			za[j] = CnNativeBride.sc_muladd(rj[j], x, s[j]);
+			zb[j] = CnNativeBride.sc_muladd(rj[j], CnNativeBride.sc_sub(x, z[j]), t[j]);
+		}
+
+		let xPow = [CnTransactions.scalar_one(), x, CnVars.Z, CnVars.Z, CnVars.Z, CnVars.Z, CnVars.Z];
+		for (let i = 2; i <= 6; ++i) {
+			xPow[i] = CnNativeBride.sc_mul(xPow[i - 1], x);
+		}
+
+		let f = CnNativeBride.sc_mul(blinding, xPow[6]);
+		for (let m = 0; m < 6; ++m) {
+			f = CnNativeBride.sc_sub(f, CnNativeBride.sc_mul(rho[m], xPow[m]));
+		}
+
+		return {I: I, A: A, B: B, Q: Q, z: z, za: za, zb: zb, f: f};
+	}
+
+	export function mlsag_round_hash(message : string, L1 : string, R1 : string, L2 : string) {
+		return Cn.hash_to_scalar(CnUtils.bintohex("MLSAG-KarboCT-v1") + message + L1 + R1 + L2);
+	}
+
+	export function mlsag_sign_ct(message : string,
+								  ringPubkeys : string[],
+								  ringCommitments : string[],
+								  pseudoCommitment : string,
+								  trueIndex : number,
+								  spendPrivkey : string,
+								  realBlinding : string,
+								  pseudoBlinding : string,
+								  keyImage : string) : CTInputSignature {
+		let ringSize = ringPubkeys.length;
+		if (ringSize === 0 || trueIndex >= ringSize) {
+			throw "Invalid MLSAG ring";
+		}
+		if (ringCommitments.length !== ringSize) {
+			throw "MLSAG ring pubkeys/commitments mismatch";
+		}
+
+		let ss : string[][] = [];
+		let c : string[] = [];
+		for (let i = 0; i < ringSize; ++i) {
+			ss[i] = [CnVars.Z, CnVars.Z];
+			c[i] = CnVars.Z;
+		}
+
+		let alpha1 = CnRandom.random_scalar();
+		let alpha2 = CnRandom.random_scalar();
+		let L1 = CnUtils.ge_scalarmult_base(alpha1);
+		let R1 = CnUtils.ge_scalarmult(CnNativeBride.hash_to_ec_2(ringPubkeys[trueIndex]), alpha1);
+		let L2 = CnUtils.ge_scalarmult_base(alpha2);
+		c[(trueIndex + 1) % ringSize] = CnTransactions.mlsag_round_hash(message, L1, R1, L2);
+
+		for (let step = 1; step < ringSize; ++step) {
+			let i = (trueIndex + step) % ringSize;
+			ss[i][0] = CnRandom.random_scalar();
+			ss[i][1] = CnRandom.random_scalar();
+
+			L1 = CnUtils.ge_double_scalarmult_base_vartime(c[i], ringPubkeys[i], ss[i][0]);
+			R1 = CnUtils.ge_double_scalarmult_postcomp_vartime(ss[i][0], ringPubkeys[i], c[i], keyImage);
+			let D = CnUtils.ge_sub(ringCommitments[i], pseudoCommitment);
+			L2 = CnUtils.ge_double_scalarmult_base_vartime(c[i], D, ss[i][1]);
+			c[(i + 1) % ringSize] = CnTransactions.mlsag_round_hash(message, L1, R1, L2);
+		}
+
+		let zSecret = CnNativeBride.sc_sub(realBlinding, pseudoBlinding);
+		ss[trueIndex][0] = CnNativeBride.sc_mulsub(c[trueIndex], spendPrivkey, alpha1);
+		ss[trueIndex][1] = CnNativeBride.sc_mulsub(c[trueIndex], zSecret, alpha2);
+
+		return {c0: c[0], ss: ss};
+	}
+
+	export function generate_signature(hash : string, pub : string, sec : string) {
+		let k = "";
+		let e = CnVars.Z;
+		let s = CnVars.Z;
+		do {
+			k = CnRandom.random_scalar();
+			let comm = CnUtils.ge_scalarmult_base(k);
+			e = Cn.hash_to_scalar(hash + pub + comm);
+			s = CnNativeBride.sc_mulsub(e, sec, k);
+		} while (e === CnVars.Z || s === CnVars.Z);
+
+		return {e: e, s: s};
+	}
+
+	export function sign_transaction_kernel(excessScalar : string, txHash : string) : TransactionKernel {
+		let excessPub = CnUtils.ge_scalarmult_base(excessScalar);
+		let sig = CnTransactions.generate_signature(txHash, excessPub, excessScalar);
+		return {
+			excessCommitment: excessPub,
+			sigE: sig.e,
+			sigS: sig.s
 		};
 	}
 	//xv: vector of secret keys, 1 per ring (nrings)
@@ -1940,6 +2445,261 @@ export namespace CnTransactions{
 		return rv;
 	}
 
+	export function construct_ct_tx(
+		keys : {
+			view: {
+				pub: string,
+				sec: string
+			},
+			spend: {
+				pub: string,
+				sec: string
+			}
+		},
+		sources : CnTransactions.Source[],
+		dsts : CnTransactions.Destination[],
+		fee_amount : any,
+		payment_id : string,
+		pid_encrypt : boolean,
+		realDestViewKey : string|undefined,
+		accountRegistration:boolean = false
+	){
+		let extra = '';
+		if (accountRegistration) {
+			extra = CnTransactions.add_account_registration_to_extra(extra, keys.spend.pub, keys.view.pub);
+		}
+
+		let tx : CnTransactions.Transaction = {
+			unlock_time: 0,
+			version: TRANSACTION_VERSION_CT,
+			fee: fee_amount,
+			extra: extra,
+			prvkey: '',
+			vin: [],
+			vout: [],
+			rct_signatures:{
+				ecdhInfo:[],
+				outPk:[],
+				pseudoOuts:[],
+				txnFee:'',
+				type:0,
+			},
+			ct_signatures: [],
+			ct_proofs: [],
+			kernel: {
+				excessCommitment: CnVars.I,
+				sigE: CnVars.Z,
+				sigS: CnVars.Z
+			},
+			signatures:[]
+		};
+
+		for (let i = 0; i < sources.length; ++i) {
+			if (sources[i].real_out >= sources[i].outputs.length) {
+				throw "real index >= outputs.length";
+			}
+			let keyImageHelper = CnTransactions.generate_key_image_helper({
+				view_secret_key: keys.view.sec,
+				spend_secret_key: keys.spend.sec,
+				public_spend_key: keys.spend.pub
+			}, sources[i].real_out_tx_key, sources[i].real_out_in_tx, null);
+			if (keyImageHelper.ephemeral_pub !== sources[i].outputs[sources[i].real_out].key) {
+				throw "in_ephemeral.pub != source.real_out.key";
+			}
+			sources[i].key_image = keyImageHelper.key_image;
+			sources[i].in_ephemeral = {
+				pub: keyImageHelper.ephemeral_pub,
+				sec: keyImageHelper.ephemeral_sec,
+				mask: sources[i].mask || CnVars.Z
+			};
+		}
+
+		sources.sort(function(a,b){
+			return JSBigInt.parse(a.key_image, 16).compare(JSBigInt.parse(b.key_image, 16)) * -1 ;
+		});
+
+		let inputs_money = JSBigInt.ZERO;
+		let inContexts : CnTransactions.Ephemeral[] = [];
+		let pseudoBlindings : string[] = [];
+		let pseudoCommitments : string[] = [];
+
+		for (let i = 0; i < sources.length; ++i) {
+			inputs_money = inputs_money.add(sources[i].amount);
+			inContexts.push(sources[i].in_ephemeral);
+
+			let pseudoBlinding = CnRandom.random_scalar();
+			let pseudoCommitment = CnTransactions.commit(CnUtils.d2s(new JSBigInt(sources[i].amount).toString()), pseudoBlinding);
+			pseudoBlindings.push(pseudoBlinding);
+			pseudoCommitments.push(pseudoCommitment);
+
+			let offsets = [];
+			let ringPubkeys = [];
+			let ringCommits = [];
+			for (let j = 0; j < sources[i].outputs.length; ++j) {
+				offsets.push(sources[i].outputs[j].index);
+				ringPubkeys.push(sources[i].outputs[j].key);
+				ringCommits.push(sources[i].outputs[j].commit);
+			}
+
+			tx.vin.push({
+				type: "confidential_input",
+				ring_amount: "" + (sources[i].ring_amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT),
+				ring_offsets: CnTransactions.abs_to_rel_offsets(offsets),
+				ring_pubkeys: ringPubkeys,
+				ring_commits: ringCommits,
+				pseudo_commit: pseudoCommitment,
+				k_image: sources[i].key_image
+			});
+		}
+
+		let txkey = CnTransactions.generate_deterministic_tx_keys(tx.vin, keys.view.sec);
+		tx.prvkey = txkey.sec;
+
+		if (payment_id) {
+			if (pid_encrypt && payment_id.length !== INTEGRATED_ID_SIZE * 2) {
+				throw "payment ID must be " + INTEGRATED_ID_SIZE + " bytes to be encrypted!";
+			}
+			if (pid_encrypt && realDestViewKey) {
+				let pid_key = CnUtils.cn_fast_hash(CnNativeBride.generate_key_derivation(realDestViewKey, txkey.sec) + ENCRYPTED_PAYMENT_ID_TAIL.toString(16)).slice(0, INTEGRATED_ID_SIZE * 2);
+				payment_id = CnUtils.hex_xor(payment_id, pid_key);
+			}
+			extra = CnTransactions.add_nonce_to_extra(extra, CnTransactions.get_payment_id_nonce(payment_id, pid_encrypt));
+		}
+		tx.extra = extra;
+
+		let num_stdaddresses = 0;
+		let num_subaddresses = 0;
+		let single_dest_subaddress : string = '';
+		let unique_dst_addresses : {[key : string] : number} = {};
+		for (let i = 0; i < dsts.length; ++i) {
+			if (new JSBigInt(dsts[i].amount).compare(0) <= 0) {
+				throw "CT output amount must be positive";
+			}
+			let destKeys = Cn.decode_address(dsts[i].address);
+			if(destKeys.view === keys.view.pub) {
+				continue;
+			}
+			if(typeof unique_dst_addresses[dsts[i].address] === 'undefined'){
+				unique_dst_addresses[dsts[i].address] = 1;
+				if(Cn.is_subaddress(dsts[i].address)){
+					++num_subaddresses;
+					single_dest_subaddress = dsts[i].address;
+				}else{
+					++num_stdaddresses;
+				}
+			}
+		}
+
+		if (num_stdaddresses == 0 && num_subaddresses == 1) {
+			let uniqueSubaddressDecoded = Cn.decode_address(single_dest_subaddress);
+			txkey.pub = CnUtils.ge_scalarmult(uniqueSubaddressDecoded.spend, txkey.sec);
+		}
+
+		let additional_tx_keys : string[] = [];
+		let additional_tx_public_keys : string[] = [];
+		let need_additional_txkeys : boolean = num_subaddresses > 0 && (num_stdaddresses > 0 || num_subaddresses > 1);
+		let outputBlindings : string[] = [];
+		let outputAmounts : any[] = [];
+		let outputCommitments : string[] = [];
+		let outputs_money = JSBigInt.ZERO;
+
+		let out_index = 0;
+		for (let i = 0; i < dsts.length; ++i) {
+			let amount = new JSBigInt(dsts[i].amount);
+			let denominationIndex = CnTransactions.denomination_index(amount);
+			if (denominationIndex < 0) {
+				throw "CT output amount is not a canonical denomination";
+			}
+
+			let destKeys = Cn.decode_address(dsts[i].address);
+			let additional_txkey : {sec:string, pub:string} = {sec:'', pub:''};
+			if(need_additional_txkeys){
+				additional_txkey = Cn.random_keypair();
+				if(Cn.is_subaddress(dsts[i].address)) {
+					additional_txkey.pub = CnUtils.ge_scalarmult(destKeys.spend, additional_txkey.sec);
+				}else {
+					additional_txkey.pub = CnUtils.ge_scalarmult_base(additional_txkey.sec);
+				}
+			}
+
+			let out_derivation;
+			if(destKeys.view === keys.view.pub) {
+				out_derivation = CnNativeBride.generate_key_derivation(txkey.pub, keys.view.sec);
+			} else {
+				if(Cn.is_subaddress(dsts[i].address) && need_additional_txkeys)
+					out_derivation = CnNativeBride.generate_key_derivation(destKeys.view, additional_txkey.sec);
+				else
+					out_derivation = CnNativeBride.generate_key_derivation(destKeys.view, txkey.sec);
+			}
+
+			if (need_additional_txkeys){
+				additional_tx_public_keys.push(additional_txkey.pub);
+				additional_tx_keys.push(additional_txkey.sec);
+			}
+
+			let blinding = CnUtils.derivation_to_scalar(out_derivation, out_index);
+			let commitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
+			let maskedAmount = CnTransactions.mask_amount(out_derivation, amount.toString());
+			let out_ephemeral_pub = CnNativeBride.derive_public_key(out_derivation, out_index, destKeys.spend);
+
+			tx.vout.push({
+				amount: 0,
+				target:{
+					type: "txout_to_confidential",
+					data: {
+						target_key: out_ephemeral_pub,
+						commitment: commitment,
+						masked_amount: maskedAmount
+					}
+				}
+			});
+			outputBlindings.push(blinding);
+			outputAmounts.push(amount);
+			outputCommitments.push(commitment);
+			outputs_money = outputs_money.add(amount);
+			++out_index;
+		}
+
+		tx.extra = CnTransactions.add_pub_key_to_extra(tx.extra, txkey.pub);
+		tx.extra = CnTransactions.add_additionnal_pub_keys_to_extra(tx.extra, additional_tx_public_keys);
+
+		if (outputs_money.add(fee_amount).compare(inputs_money) > 0) {
+			throw "outputs money (" + Cn.formatMoneyFull(outputs_money) + ") + fee (" + Cn.formatMoneyFull(fee_amount) + ") > inputs money (" + Cn.formatMoneyFull(inputs_money) + ")";
+		}
+
+		let signingHash = CnTransactions.get_tx_prefix_hash(tx);
+		tx.ct_proofs = [];
+		for (let i = 0; i < outputCommitments.length; ++i) {
+			tx.ct_proofs.push(CnTransactions.gk_prove(outputCommitments[i], outputAmounts[i], outputBlindings[i], signingHash));
+		}
+
+		tx.ct_signatures = [];
+		for (let i = 0; i < sources.length; ++i) {
+			tx.ct_signatures.push(CnTransactions.mlsag_sign_ct(
+				signingHash,
+				(tx.vin[i].ring_pubkeys || []),
+				(tx.vin[i].ring_commits || []),
+				pseudoCommitments[i],
+				sources[i].real_out,
+				inContexts[i].sec,
+				inContexts[i].mask,
+				pseudoBlindings[i],
+				tx.vin[i].k_image
+			));
+		}
+
+		let sumPseudo = CnVars.Z;
+		let sumOutputs = CnVars.Z;
+		for (let blind of pseudoBlindings) {
+			sumPseudo = CnNativeBride.sc_add(sumPseudo, blind);
+		}
+		for (let blind of outputBlindings) {
+			sumOutputs = CnNativeBride.sc_add(sumOutputs, blind);
+		}
+		tx.kernel = CnTransactions.sign_transaction_kernel(CnNativeBride.sc_sub(sumPseudo, sumOutputs), signingHash);
+		return tx;
+	}
+
 	export function construct_tx(
 		keys : {
 			view: {
@@ -1961,6 +2721,10 @@ export namespace CnTransactions{
 		rct:boolean,
 		accountRegistration:boolean = false
 	){
+		if (rct) {
+			return CnTransactions.construct_ct_tx(keys, sources, dsts, fee_amount, payment_id, pid_encrypt, realDestViewKey, accountRegistration);
+		}
+
 		let extra = '';
 		if (accountRegistration) {
 			extra = CnTransactions.add_account_registration_to_extra(extra, keys.spend.pub, keys.view.pub);
@@ -2036,10 +2800,10 @@ export namespace CnTransactions{
 			};
 			for (j = 0; j < sources[i].outputs.length; ++j) {
 				console.log('add to key offsets',sources[i].outputs[j].index, j, sources[i].outputs);
-				input_to_key.key_offsets.push(sources[i].outputs[j].index);
+				(input_to_key.key_offsets || []).push(sources[i].outputs[j].index);
 			}
 			console.log('key offsets before abs',input_to_key.key_offsets);
-			input_to_key.key_offsets = CnTransactions.abs_to_rel_offsets(input_to_key.key_offsets);
+			input_to_key.key_offsets = CnTransactions.abs_to_rel_offsets(input_to_key.key_offsets || []);
 			console.log('key offsets after abs',input_to_key.key_offsets);
 			tx.vin.push(input_to_key);
 		}
@@ -2181,7 +2945,7 @@ export namespace CnTransactions{
 					x: in_contexts[i].sec,
 					a: in_contexts[i].mask,
 				});
-				inAmounts.push(tx.vin[i].amount);
+				inAmounts.push(tx.vin[i].amount || "0");
 				if (in_contexts[i].mask !== CnVars.I) {
 					//if input is rct (has a valid mask), 0 out amount
 					tx.vin[i].amount = "0";
@@ -2213,20 +2977,8 @@ export namespace CnTransactions{
 	export function create_transaction(pub_keys:{spend:string,view:string},
 									   sec_keys:{spend:string,view:string},
 									   dsts : CnTransactions.Destination[],
-									   outputs : {
-										   amount:number,
-										   public_key:string,
-										   index:number,
-										   global_index:number,
-										   tx_pub_key:string,
-									   }[],
-									   mix_outs:{
-										   outs:{
-											   public_key:string,
-											   global_index:number
-										   }[],
-										   amount:0
-									   }[] = [],
+									   outputs : any[],
+									   mix_outs:any[] = [],
 									   fake_outputs_count:number,
 									   fee_amount : any/*JSBigInt*/,
 									   payment_id : string,
@@ -2279,6 +3031,7 @@ export namespace CnTransactions{
 			let src : CnTransactions.Source = {
 				outputs: [],
 				amount: '',
+				ring_amount: '',
 				real_out_tx_key:'',
 				real_out:0,
 				real_out_in_tx:0,
@@ -2291,10 +3044,12 @@ export namespace CnTransactions{
 				}
 			};
 			src.amount = new JSBigInt(outputs[i].amount).toString();
+			let isConfidentialRealOutput = !!(outputs[i].ctCommitment || outputs[i].ctMaskedAmount || outputs[i].commitment || outputs[i].masked_amount);
+			src.ring_amount = outputs[i].ring_amount || outputs[i].ringAmount || (isConfidentialRealOutput ? CT_CONFIDENTIAL_OUTPUT_AMOUNT : src.amount);
 			if (mix_outs.length !== 0) { // if mixin
 				// Sort fake outputs by global index
 				console.log('mix outs before sort',mix_outs[i].outs);
-				mix_outs[i].outs.sort(function(a, b) {
+				mix_outs[i].outs.sort(function(a:any, b:any) {
 					return new JSBigInt(a.global_index).compare(b.global_index);
 				});
 				j = 0;
@@ -2306,15 +3061,25 @@ export namespace CnTransactions{
 					console.log('chekcing mixin');
 					console.log("out: ", out);
 					console.log("output ", i, ": ", outputs[i]);
-					if (out.global_index === outputs[i].global_index) {
+					if (new JSBigInt(out.global_index).compare(outputs[i].global_index) === 0) {
 						console.log('got mixin the same as output, skipping');
 						j++;
 						continue;
 					}
+					let mixCommitment = out.commitment || out.ctCommitment || out.ct_commitment || out.commit || '';
+					if (!mixCommitment && out.rct) {
+						mixCommitment = out.rct.slice(0, 64);
+					}
+					if (rct && !mixCommitment) {
+						if (src.ring_amount === CT_CONFIDENTIAL_OUTPUT_AMOUNT) {
+							throw "mix CT outs missing commitment";
+						}
+						mixCommitment = CnTransactions.zeroCommit(CnUtils.d2s(src.amount));
+					}
 					let oe : Output = {
 						index:out.global_index.toString(),
-						key:out.public_key,
-						commit:''
+						key:out.public_key || out.key || out.target_key,
+						commit:mixCommitment
 					};
 					/*
 					if (rct){
@@ -2333,9 +3098,18 @@ export namespace CnTransactions{
 			} // end of if mixin
 			let real_oe = {
 				index:new JSBigInt(outputs[i].global_index || 0).toString(),
-				key:outputs[i].public_key,
+				key:outputs[i].public_key || outputs[i].key || outputs[i].target_key,
 				commit:'',
 			};
+			if (rct) {
+				real_oe.commit = outputs[i].ctCommitment || outputs[i].commitment || '';
+				if (outputs[i].rct && !real_oe.commit) {
+					real_oe.commit = outputs[i].rct.slice(0, 64);
+				}
+				if (!real_oe.commit) {
+					real_oe.commit = CnTransactions.zeroCommit(CnUtils.d2s(src.amount));
+				}
+			}
 			console.log('OUT FOR REAL:',outputs[i].global_index);
 			/*
 			if (rct){
@@ -2363,6 +3137,15 @@ export namespace CnTransactions{
 			src.real_out = real_index;
 			src.real_out_in_tx = outputs[i].index;
 			console.log('check mask', outputs, rct, i);
+			if (rct) {
+				src.mask = outputs[i].ctBlinding || outputs[i].mask || null;
+				if (!src.mask && src.ring_amount === CT_CONFIDENTIAL_OUTPUT_AMOUNT) {
+					throw "Missing CT blinding for selected confidential output";
+				}
+				if (!src.mask) {
+					src.mask = CnVars.Z;
+				}
+			}
 			/*
 			if (rct){
 				if (outputs[i].rct) {
