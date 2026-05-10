@@ -66,6 +66,9 @@ let CT_DENOMINATIONS = [
 	"10000000000000000", "20000000000000000", "30000000000000000", "40000000000000000", "50000000000000000", "60000000000000000", "70000000000000000", "80000000000000000", "90000000000000000",
 	"100000000000000000"
 ];
+let CT_MAX_RING_SIZE = 16;
+let CT_MAX_INPUTS = 512;
+let CT_MAX_OUTPUTS = 256;
 let TX_EXTRA_NONCE_MAX_COUNT = 255;
 let TX_EXTRA_TAGS = {
 	PADDING: '00',
@@ -1102,25 +1105,38 @@ export namespace CnTransactions{
 		return C;
 	}
 
-	export function mask_amount(sharedSecret : string, amount : number|string|any) {
+	function check_ct_array_size(size : number, maxSize : number, fieldName : string) {
+		if (size > maxSize) {
+			throw "CT " + fieldName + " size " + size + " exceeds limit " + maxSize;
+		}
+	}
+
+	function amount_mask(sharedSecret : string, outputIndex : number) {
 		if (sharedSecret.length !== 64 || !CnUtils.valid_hex(sharedSecret)) {
 			throw "Invalid shared secret";
 		}
+		if (outputIndex < 0 || Math.floor(outputIndex) !== outputIndex) {
+			throw "Invalid CT output index";
+		}
+		return Cn.hash_to_scalar(sharedSecret + CnUtils.encode_varint(outputIndex) + CnUtils.bintohex("amount-mask-v1")).slice(0, 16);
+	}
+
+	export function mask_amount(sharedSecret : string, outputIndex : number, amount : number|string|any) {
 		let amountLe = CnUtils.u64_to_le_hex(amount);
-		let mask = Cn.hash_to_scalar(sharedSecret + "00").slice(0, 16);
+		let mask = amount_mask(sharedSecret, outputIndex);
 		return CnUtils.hex_xor(amountLe, mask);
 	}
 
-	export function unmask_amount(sharedSecret : string, maskedAmount : string) {
-		if (sharedSecret.length !== 64 || maskedAmount.length !== 16 || !CnUtils.valid_hex(maskedAmount)) {
+	export function unmask_amount(sharedSecret : string, outputIndex : number, maskedAmount : string) {
+		if (maskedAmount.length !== 16 || !CnUtils.valid_hex(maskedAmount)) {
 			throw "Invalid CT amount mask";
 		}
-		let mask = Cn.hash_to_scalar(sharedSecret + "00").slice(0, 16);
+		let mask = amount_mask(sharedSecret, outputIndex);
 		return CnUtils.le_hex_to_u64(CnUtils.hex_xor(maskedAmount, mask));
 	}
 
 	export function decode_ct_amount(maskedAmount : string, commitment : string, derivation : string, outIndex : number) {
-		let amount = CnTransactions.unmask_amount(derivation, maskedAmount);
+		let amount = CnTransactions.unmask_amount(derivation, outIndex, maskedAmount);
 		let blinding = CnUtils.derivation_to_scalar(derivation, outIndex);
 		let expectedCommitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
 		if (commitment && expectedCommitment !== commitment) {
@@ -1593,18 +1609,27 @@ export namespace CnTransactions{
 				break;
 			case "confidential_input":
 			case "input_to_confidential":
+				let ringOffsets = input.ring_offsets || input.key_offsets || [];
+				let ringPubkeys = input.ring_pubkeys || [];
+				let ringCommits = input.ring_commits || [];
+				check_ct_array_size(ringOffsets.length, CT_MAX_RING_SIZE, "ring_offsets");
+				check_ct_array_size(ringPubkeys.length, CT_MAX_RING_SIZE, "ring_pubkeys");
+				check_ct_array_size(ringCommits.length, CT_MAX_RING_SIZE, "ring_commits");
+				if (ringCommits.length !== ringPubkeys.length) {
+					throw "CT ring_commits size does not match ring_pubkeys size";
+				}
 				buf += "04";
 				buf += CnUtils.encode_varint(input.ring_amount || input.amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT);
-				buf += CnUtils.encode_varint((input.ring_offsets || input.key_offsets || []).length);
-				for (let offset of (input.ring_offsets || input.key_offsets || [])) {
+				buf += CnUtils.encode_varint(ringOffsets.length);
+				for (let offset of ringOffsets) {
 					buf += CnUtils.encode_varint(offset);
 				}
-				buf += CnUtils.encode_varint((input.ring_pubkeys || []).length);
-				for (let pubkey of (input.ring_pubkeys || [])) {
+				buf += CnUtils.encode_varint(ringPubkeys.length);
+				for (let pubkey of ringPubkeys) {
 					buf += pubkey;
 				}
-				buf += CnUtils.encode_varint((input.ring_commits || []).length);
-				for (let commit of (input.ring_commits || [])) {
+				buf += CnUtils.encode_varint(ringCommits.length);
+				for (let commit of ringCommits) {
 					buf += commit;
 				}
 				buf += input.pseudo_commit || "";
@@ -1640,9 +1665,11 @@ export namespace CnTransactions{
 	export function serialize_ct_body(tx : CnTransactions.Transaction) {
 		let buf = "";
 		let signatures = tx.ct_signatures || [];
+		check_ct_array_size(signatures.length, CT_MAX_INPUTS, "ct_signatures");
 		buf += CnUtils.encode_varint(signatures.length);
 		for (let sig of signatures) {
 			buf += sig.c0;
+			check_ct_array_size(sig.ss.length, CT_MAX_RING_SIZE, "ss");
 			buf += CnUtils.encode_varint(sig.ss.length);
 			for (let row of sig.ss) {
 				buf += row[0];
@@ -1651,6 +1678,7 @@ export namespace CnTransactions{
 		}
 
 		let proofs = tx.ct_proofs || [];
+		check_ct_array_size(proofs.length, CT_MAX_OUTPUTS, "ct_proofs");
 		buf += CnUtils.encode_varint(proofs.length);
 		for (let proof of proofs) {
 			for (let field of ["I", "A", "B", "Q", "z", "za", "zb"]) {
@@ -1678,6 +1706,8 @@ export namespace CnTransactions{
 		let buf = "";
 		buf += CnUtils.encode_varint(tx.version);
 		if (tx.version === TRANSACTION_VERSION_CT) {
+			check_ct_array_size(tx.vin.length, CT_MAX_INPUTS, "vin");
+			check_ct_array_size(tx.vout.length, CT_MAX_OUTPUTS, "vout");
 			buf += CnUtils.encode_varint(tx.fee || 0);
 		} else {
 			buf += CnUtils.encode_varint(tx.unlock_time);
@@ -2643,7 +2673,7 @@ export namespace CnTransactions{
 
 			let blinding = CnUtils.derivation_to_scalar(out_derivation, out_index);
 			let commitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
-			let maskedAmount = CnTransactions.mask_amount(out_derivation, amount.toString());
+			let maskedAmount = CnTransactions.mask_amount(out_derivation, out_index, amount.toString());
 			let out_ephemeral_pub = CnNativeBride.derive_public_key(out_derivation, out_index, destKeys.spend);
 
 			tx.vout.push({
