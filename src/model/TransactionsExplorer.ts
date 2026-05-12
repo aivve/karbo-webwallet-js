@@ -160,10 +160,30 @@ export class TransactionsExplorer {
 					return null;
 				}
 				let value : any = rawVin.value;
+
+				// Prefer the per-member ring_members layout from the mixed-ring
+				// schema; fall back to the legacy single-bucket (ring_amount +
+				// ring_offsets) layout for any old daemon RPC responses still
+				// in flight during the rollout.
+				let ringMembers : CnTransactions.RingMember[] = [];
+				if (Array.isArray(value.ring_members)) {
+					for (let m of value.ring_members) {
+						ringMembers.push({
+							amount: '' + (m.amount !== undefined ? m.amount : (m.ringAmount || CnTransactions.ctConfidentialOutputAmount())),
+							output_index: m.output_index !== undefined ? m.output_index : m.outputIndex
+						});
+					}
+				} else {
+					let legacyBucket = '' + (value.ring_amount || value.ringAmount || CnTransactions.ctConfidentialOutputAmount());
+					let legacyOffsets = (value.ring_offsets || value.ringOutputIndexes || []);
+					for (let offset of legacyOffsets) {
+						ringMembers.push({ amount: legacyBucket, output_index: offset });
+					}
+				}
+
 				inputs.push({
 					type: 'confidential_input',
-					ring_amount: '' + (value.ring_amount || value.ringAmount || CnTransactions.ctConfidentialOutputAmount()),
-					ring_offsets: (value.ring_offsets || value.ringOutputIndexes || []).slice(),
+					ring_members: ringMembers,
 					ring_pubkeys: (value.ring_pubkeys || value.ringPubkeys || []).slice(),
 					ring_commits: (value.ring_commits || value.ringCommitments || []).slice(),
 					pseudo_commit: value.pseudo_commit || value.pseudoCommitment || '',
@@ -387,10 +407,29 @@ export class TransactionsExplorer {
 				if (!vin.value) continue;
 
 				let vinValue : any = vin.value;
-				let relativeOffsets = (vinValue.key_offsets || vinValue.ring_offsets || vinValue.ringOutputIndexes || []);
-				let absoluteOffets = relativeOffsets.map(function(offset:any) { return new JSBigInt(offset).toJSValue(); });
-				for (let i = 1; i < absoluteOffets.length; ++i) {
-					absoluteOffets[i] = new JSBigInt(absoluteOffets[i]).add(absoluteOffets[i - 1]).toJSValue();
+				// Two sources of ring offsets:
+				//   (a) New per-member schema: vin.ring_members[k].output_index
+				//       is *absolute* — no delta decoding needed. Mixed-bucket
+				//       rings live here too, but for the "is this output of
+				//       mine spent" heuristic we don't need the bucket; an
+				//       index match alone is suggestive enough.
+				//   (b) Legacy single-bucket schema: vin.ring_offsets /
+				//       ringOutputIndexes / key_offsets are *relative* and
+				//       need delta decoding.
+				let absoluteOffets : number[] = [];
+				if (Array.isArray(vinValue.ring_members) && vinValue.ring_members.length > 0) {
+					for (let m of vinValue.ring_members) {
+						let idx = m.output_index !== undefined ? m.output_index : m.outputIndex;
+						if (idx !== undefined) {
+							absoluteOffets.push(new JSBigInt(idx).toJSValue());
+						}
+					}
+				} else {
+					let relativeOffsets = (vinValue.key_offsets || vinValue.ring_offsets || vinValue.ringOutputIndexes || []);
+					absoluteOffets = relativeOffsets.map(function(offset:any) { return new JSBigInt(offset).toJSValue(); });
+					for (let i = 1; i < absoluteOffets.length; ++i) {
+						absoluteOffets[i] = new JSBigInt(absoluteOffets[i]).add(absoluteOffets[i - 1]).toJSValue();
+					}
 				}
 
 				let ownTx = -1;

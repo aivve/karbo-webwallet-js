@@ -1121,6 +1121,23 @@ export namespace CnTransactions{
 		return Cn.hash_to_scalar(sharedSecret + CnUtils.encode_varint(outputIndex) + CnUtils.bintohex("amount-mask-v1")).slice(0, 16);
 	}
 
+	// CT blinding factor = Hs(shared_secret || varint(output_index) || "ct-blinding-v1").
+	//
+	// The domain tag is CRITICAL. Without it this scalar equals derivation_to_scalar(),
+	// which is the stealth scalar s in P = s*G + B_spend. A passive observer who knows
+	// the recipient's public address B_spend could then compute r*G = P - B_spend and
+	// recover the amount v from C = v*H + r*G by brute force over the 64 canonical
+	// denominations — breaking CT confidentiality. Matches src/crypto/ct_ecdh.cpp.
+	export function derive_ct_blinding(sharedSecret : string, outputIndex : number) : string {
+		if (sharedSecret.length !== 64 || !CnUtils.valid_hex(sharedSecret)) {
+			throw "Invalid shared secret";
+		}
+		if (outputIndex < 0 || Math.floor(outputIndex) !== outputIndex) {
+			throw "Invalid CT output index";
+		}
+		return Cn.hash_to_scalar(sharedSecret + CnUtils.encode_varint(outputIndex) + CnUtils.bintohex("ct-blinding-v1"));
+	}
+
 	export function mask_amount(sharedSecret : string, outputIndex : number, amount : number|string|any) {
 		let amountLe = CnUtils.u64_to_le_hex(amount);
 		let mask = amount_mask(sharedSecret, outputIndex);
@@ -1137,7 +1154,7 @@ export namespace CnTransactions{
 
 	export function decode_ct_amount(maskedAmount : string, commitment : string, derivation : string, outIndex : number) {
 		let amount = CnTransactions.unmask_amount(derivation, outIndex, maskedAmount);
-		let blinding = CnUtils.derivation_to_scalar(derivation, outIndex);
+		let blinding = CnTransactions.derive_ct_blinding(derivation, outIndex);
 		let expectedCommitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
 		if (commitment && expectedCommitment !== commitment) {
 			throw "CT output commitment mismatch";
@@ -1462,11 +1479,20 @@ export namespace CnTransactions{
 		index:string,
 		key:string,
 		commit:string,
+		// Per-member bucket amount. For transparent ring members, the real
+		// on-chain amount; for confidential ring members, CT_CONFIDENTIAL_OUTPUT_AMOUNT.
+		// Optional only for backwards compatibility with code paths that still
+		// derive the bucket from Source.ring_amount; the CT input serializer
+		// requires this to be set on every Output.
+		amount?:string,
 	};
 
 	export type Source = {
 		outputs:CnTransactions.Output[],
 		amount:any,
+		// Bucket the *real* spend lives in. Kept for callers that haven't
+		// migrated to per-Output amounts yet. New code should populate
+		// Output.amount on every ring member instead.
 		ring_amount?:any,
 		real_out_tx_key:string,
 		real_out:number,
@@ -1478,11 +1504,25 @@ export namespace CnTransactions{
 
 	export type Destination = {address:string,amount:number};
 
+	// Per-ring-member output reference. Mirror of C++ RingMemberRef:
+	// each member declares its own amount bucket and absolute offset, so
+	// CT inputs can mix transparent and confidential ring members.
+	export type RingMember = {
+		amount: string,
+		output_index: any,
+	};
+
 	export type Vin = {
 		type:string,
 		amount?:string,
 		k_image:string,
 		key_offsets?:any[],
+		// Per-member ring references (preferred). Replaces the legacy
+		// single-bucket ring_amount + ring_offsets pair for CT inputs.
+		ring_members?:RingMember[],
+		// Legacy single-bucket fields. Still accepted on parse for chain data
+		// produced before the mixed-ring schema landed; new code must
+		// populate ring_members.
 		ring_amount?:string,
 		ring_offsets?:any[],
 		ring_pubkeys?:string[],
@@ -1609,20 +1649,27 @@ export namespace CnTransactions{
 				break;
 			case "confidential_input":
 			case "input_to_confidential":
-				let ringOffsets = input.ring_offsets || input.key_offsets || [];
+				// Mixed-bucket ring schema: each member is (amount, outputIndex)
+				// and the three parallel arrays (members, pubkeys, commits)
+				// must have equal length. Members must be sorted by
+				// (amount, outputIndex) strictly ascending (canonical form).
+				let ringMembers = input.ring_members || [];
 				let ringPubkeys = input.ring_pubkeys || [];
 				let ringCommits = input.ring_commits || [];
-				check_ct_array_size(ringOffsets.length, CT_MAX_RING_SIZE, "ring_offsets");
+				check_ct_array_size(ringMembers.length, CT_MAX_RING_SIZE, "ring_members");
 				check_ct_array_size(ringPubkeys.length, CT_MAX_RING_SIZE, "ring_pubkeys");
 				check_ct_array_size(ringCommits.length, CT_MAX_RING_SIZE, "ring_commits");
-				if (ringCommits.length !== ringPubkeys.length) {
-					throw "CT ring_commits size does not match ring_pubkeys size";
+				if (ringPubkeys.length !== ringMembers.length) {
+					throw "CT ring_pubkeys size does not match ring_members size";
+				}
+				if (ringCommits.length !== ringMembers.length) {
+					throw "CT ring_commits size does not match ring_members size";
 				}
 				buf += "04";
-				buf += CnUtils.encode_varint(input.ring_amount || input.amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT);
-				buf += CnUtils.encode_varint(ringOffsets.length);
-				for (let offset of ringOffsets) {
-					buf += CnUtils.encode_varint(offset);
+				buf += CnUtils.encode_varint(ringMembers.length);
+				for (let member of ringMembers) {
+					buf += CnUtils.encode_varint(member.amount);
+					buf += CnUtils.encode_varint(member.output_index);
 				}
 				buf += CnUtils.encode_varint(ringPubkeys.length);
 				for (let pubkey of ringPubkeys) {
@@ -2566,19 +2613,51 @@ export namespace CnTransactions{
 			pseudoBlindings.push(pseudoBlinding);
 			pseudoCommitments.push(pseudoCommitment);
 
-			let offsets = [];
-			let ringPubkeys = [];
-			let ringCommits = [];
+			// Build per-member ring references. Each output is self-describing:
+			// transparent → its real amount; confidential → CT sentinel.
+			// Fall back to Source.ring_amount (legacy single-bucket) when an
+			// Output.amount isn't set so existing callers don't break.
+			let sourceBucket = "" + (sources[i].ring_amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT);
+			let ringMembers : CnTransactions.RingMember[] = [];
+			let ringPubkeys : string[] = [];
+			let ringCommits : string[] = [];
 			for (let j = 0; j < sources[i].outputs.length; ++j) {
-				offsets.push(sources[i].outputs[j].index);
+				let memberAmount = sources[i].outputs[j].amount;
+				if (memberAmount === undefined || memberAmount === null || memberAmount === '') {
+					memberAmount = sourceBucket;
+				}
+				ringMembers.push({
+					amount: "" + memberAmount,
+					output_index: sources[i].outputs[j].index,
+				});
 				ringPubkeys.push(sources[i].outputs[j].key);
 				ringCommits.push(sources[i].outputs[j].commit);
 			}
 
+			// Canonical ordering: members must be sorted by (amount, outputIndex)
+			// strictly ascending. We permute the parallel arrays AND remap
+			// sources[i].real_out + sources[i].outputs so subsequent MLSAG signing
+			// (which still reads sources[i].real_out) lines up with the on-chain
+			// ring order.
+			let memberPerm = ringMembers.map((m, idx) => idx);
+			memberPerm.sort((a, b) => {
+				let ma = ringMembers[a], mb = ringMembers[b];
+				let amountCmp = new JSBigInt(ma.amount).compare(new JSBigInt(mb.amount));
+				if (amountCmp !== 0) return amountCmp;
+				return new JSBigInt(ma.output_index).compare(new JSBigInt(mb.output_index));
+			});
+			ringMembers = memberPerm.map(idx => ringMembers[idx]);
+			ringPubkeys = memberPerm.map(idx => ringPubkeys[idx]);
+			ringCommits = memberPerm.map(idx => ringCommits[idx]);
+			sources[i].outputs = memberPerm.map(idx => sources[i].outputs[idx]);
+			sources[i].real_out = memberPerm.indexOf(sources[i].real_out);
+			if (sources[i].real_out < 0) {
+				throw "CT input lost real ring member during canonicalisation at index " + i;
+			}
+
 			tx.vin.push({
 				type: "confidential_input",
-				ring_amount: "" + (sources[i].ring_amount || CT_CONFIDENTIAL_OUTPUT_AMOUNT),
-				ring_offsets: CnTransactions.abs_to_rel_offsets(offsets),
+				ring_members: ringMembers,
 				ring_pubkeys: ringPubkeys,
 				ring_commits: ringCommits,
 				pseudo_commit: pseudoCommitment,
@@ -2671,7 +2750,7 @@ export namespace CnTransactions{
 				additional_tx_keys.push(additional_txkey.sec);
 			}
 
-			let blinding = CnUtils.derivation_to_scalar(out_derivation, out_index);
+			let blinding = CnTransactions.derive_ct_blinding(out_derivation, out_index);
 			let commitment = CnTransactions.commit(CnUtils.d2s(amount.toString()), blinding);
 			let maskedAmount = CnTransactions.mask_amount(out_derivation, out_index, amount.toString());
 			let out_ephemeral_pub = CnNativeBride.derive_public_key(out_derivation, out_index, destKeys.spend);
@@ -3113,7 +3192,8 @@ export namespace CnTransactions{
 					let oe : Output = {
 						index:out.global_index.toString(),
 						key:out.public_key || out.key || out.target_key,
-						commit:mixCommitment
+						commit:mixCommitment,
+						amount: src.ring_amount, // bucket this decoy was queried from
 					};
 					/*
 					if (rct){
@@ -3130,10 +3210,11 @@ export namespace CnTransactions{
 					j++;
 				}
 			} // end of if mixin
-			let real_oe = {
+			let real_oe : Output = {
 				index:new JSBigInt(outputs[i].global_index || 0).toString(),
 				key:outputs[i].public_key || outputs[i].key || outputs[i].target_key,
 				commit:'',
+				amount: src.ring_amount, // bucket the real spend lives in
 			};
 			if (rct) {
 				real_oe.commit = outputs[i].ctCommitment || outputs[i].commitment || '';
