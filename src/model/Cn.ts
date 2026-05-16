@@ -3092,6 +3092,13 @@ export namespace CnTransactions{
 		}
 
 		tx.ct_signatures = [];
+		// Triptych signing is the dominant per-input CT cost (each input
+		// runs ~6 × log2(ring) point multiplications plus a Fermat scalar
+		// inversion). Log per-input wall-clock so testnet operators can
+		// see what the user is waiting for; the totals also surface any
+		// pathological inputs from real-world tx shapes.
+		const tStart = performance.now();
+		let tLast = tStart;
 		for (let i = 0; i < sources.length; ++i) {
 			tx.ct_signatures.push(CnTransactions.triptych_sign_ct(
 				signingHash,
@@ -3104,6 +3111,15 @@ export namespace CnTransactions{
 				pseudoBlindings[i],
 				tx.vin[i].k_image
 			));
+			const tNow = performance.now();
+			console.debug("[Triptych] input " + i +
+				" ring=" + (tx.vin[i].ring_pubkeys || []).length +
+				" signed in " + (tNow - tLast).toFixed(1) + " ms");
+			tLast = tNow;
+		}
+		if (sources.length > 1) {
+			console.debug("[Triptych] " + sources.length +
+				" inputs signed in " + (tLast - tStart).toFixed(1) + " ms total");
 		}
 
 		let sumPseudo = CnVars.Z;

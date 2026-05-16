@@ -30,8 +30,10 @@ import {WalletWatchdog} from "../model/WalletWatchdog";
 
 let wallet: Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
 let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
-const MIN_RING_SIZE = 4;
-const MAX_RING_SIZE = 16;
+// Triptych ring sizes the daemon accepts for non-coinbase inputs. The
+// coinbase carve-out (ring size 1) is selected automatically by the
+// wallet; the user only picks among the privacy-preserving values.
+const RING_SIZE_CHOICES = [4, 8, 16];
 const MIN_FEE = '0.01';
 const MAX_FEE = '0.1';
 
@@ -508,16 +510,8 @@ class SendView extends DestructableView {
 
 	@VueWatched()
 	ringSizeWatch() {
-		try {
-			this.ringSizeIsValid = !isNaN(parseFloat(this.ringSize));
-
-			let ringSize: number = parseFloat(this.ringSize);
-			if (ringSize > MAX_RING_SIZE || ringSize < MIN_RING_SIZE || Math.floor(ringSize) !== ringSize)
-			    this.ringSizeIsValid = false;
-
-		} catch (e) {
-			this.ringSizeIsValid = false;
-		}
+		const ringSize = parseInt(this.ringSize, 10);
+		this.ringSizeIsValid = RING_SIZE_CHOICES.indexOf(ringSize) >= 0;
 	}
 
 	@VueWatched()

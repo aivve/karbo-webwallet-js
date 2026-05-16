@@ -66,7 +66,15 @@
 				<div class="advancedFields" v-if="advancedOpen">
 					<div class="field">
 						<label>{{ $t("sendPage.sendBlock.mixin.label") }}</label>
-						<input class="amountInput" type="number" min="4" max="16" step="1" v-model="ringSize" placeholder="16" :readonly="lockedForm"/>
+						<!-- Triptych supports ring sizes 1, 4, 8 and 16 only. Ring 1 is the
+						     v5+ coinbase Schnorr-branch carve-out and is selected
+						     automatically by the wallet for unmixable mining outputs;
+						     the user only picks among the privacy-preserving choices. -->
+						<select class="amountInput" v-model="ringSize" :disabled="lockedForm">
+							<option value="4">4</option>
+							<option value="8">8</option>
+							<option value="16">16</option>
+						</select>
 						<div v-if="!ringSizeIsValid && ringSize != ''" class="message error">
 							{{ $t("sendPage.sendBlock.mixin.invalid") }}
 						</div>

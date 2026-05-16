@@ -301,7 +301,7 @@
 		},
 		"mixin":{
 		  "label":"Ring size",
-		  "invalid":"The ring size is invalid, should be from 4 to 16"
+		  "invalid":"The ring size is invalid; pick one of 4, 8, or 16"
 		},
 		"fee":{
 		  "label":"Fee",
