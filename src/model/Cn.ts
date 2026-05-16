@@ -634,6 +634,32 @@ export namespace CnNativeBride{
 		return CnNativeBride.sc_add(CnNativeBride.sc_mul(scalar1, scalar2), scalar3);
 	}
 
+	// scalar^(L−2) mod L  →  the multiplicative inverse via Fermat's little
+	// theorem. Only needed in the Triptych prover (the f_U response carries
+	// x⁻¹ so that the U-ring equation closes against the key image base I).
+	// L − 2 is hard-coded little-endian so the JS bignum layer doesn't have
+	// to know about the Ed25519 group order.
+	export function sc_invert(scalar : string) : string {
+		if (scalar.length !== KEY_SIZE * 2 || !CnUtils.valid_hex(scalar)) {
+			throw "Invalid scalar to invert";
+		}
+		// L − 2  where  L = 2^252 + 27742317777372353535851937790883648493,
+		// encoded little-endian. Exponent for Fermat's little theorem.
+		const exp = CnUtils.hextobin("ebd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010");
+		// Accumulator starts at 1 (scalar one in 32-byte little-endian).
+		let acc = "0100000000000000000000000000000000000000000000000000000000000000";
+		let base = scalar;
+		for (let byte_i = 0; byte_i < 32; ++byte_i) {
+			for (let bit_i = 0; bit_i < 8; ++bit_i) {
+				if ((exp[byte_i] >> bit_i) & 1) {
+					acc = CnNativeBride.sc_mul(acc, base);
+				}
+				base = CnNativeBride.sc_mul(base, base);
+			}
+		}
+		return acc;
+	}
+
 	//res = c - (ab) mod l; argument names copied from the signature implementation
 	export function sc_mulsub(sigc : string, sec : string, k : string) {
 		if (k.length !== KEY_SIZE * 2 || sigc.length !== KEY_SIZE * 2 || sec.length !== KEY_SIZE * 2 || !CnUtils.valid_hex(k) || !CnUtils.valid_hex(sigc) || !CnUtils.valid_hex(sec)) {
@@ -1543,9 +1569,26 @@ export namespace CnTransactions{
 		}
 	};
 
+	// Triptych spend proof. Vector lengths follow the on-wire rule:
+	//   n = 0 (ring size 1, Schnorr branch — v5+ coinbase carve-out)
+	//     I_bits, A, B, z, za, zb : empty
+	//     Q_P, Q_M, Q_U           : one entry each (Schnorr nonce commits)
+	//   n ∈ {2, 3, 4} (ring sizes 4 / 8 / 16, full Triptych)
+	//     I_bits, A, B, Q_P, Q_M, Q_U, z, za, zb : n entries each
+	// f_P, f_M, f_U are always present.
 	export type CTInputSignature = {
-		c0:string,
-		ss:string[][]
+		I_bits:string[],
+		A:string[],
+		B:string[],
+		Q_P:string[],
+		Q_M:string[],
+		Q_U:string[],
+		z:string[],
+		za:string[],
+		zb:string[],
+		f_P:string,
+		f_M:string,
+		f_U:string
 	};
 
 	export type CTOutputProof = {
@@ -1714,14 +1757,48 @@ export namespace CnTransactions{
 		let signatures = tx.ct_signatures || [];
 		check_ct_array_size(signatures.length, CT_MAX_INPUTS, "ct_signatures");
 		buf += CnUtils.encode_varint(signatures.length);
+		// Per-input Triptych spend proof — wire format:
+		//   byte         n                  (0 for Schnorr branch, else 2/3/4)
+		//   6 × n_bits   I_bits, A, B,
+		//   3 × n_q      Q_P, Q_M, Q_U      (n_q = max(1, n) — the Schnorr
+		//                                    branch keeps one entry per Q
+		//                                    array for the nonce commits)
+		//   3 × n_bits   z, za, zb
+		//   3            f_P, f_M, f_U
+		// where n_bits = n (0 when n=0).
 		for (let sig of signatures) {
-			buf += sig.c0;
-			check_ct_array_size(sig.ss.length, CT_MAX_RING_SIZE, "ss");
-			buf += CnUtils.encode_varint(sig.ss.length);
-			for (let row of sig.ss) {
-				buf += row[0];
-				buf += row[1];
+			let nBits = sig.I_bits.length;
+			let nQ = sig.Q_P.length;
+			// Recover n from the proof shape.
+			//   nBits === 0 && nQ === 1                    → Schnorr branch, n=0
+			//   nBits ∈ {2,3,4} && nQ === nBits            → full Triptych
+			// anything else is ill-formed and rejected before reaching the wire.
+			let n : number;
+			if (nBits === 0 && nQ === 1) {
+				n = 0;
+			} else if ((nBits === 2 || nBits === 3 || nBits === 4) && nQ === nBits) {
+				n = nBits;
+			} else {
+				throw "Triptych: invalid proof shape on serialize (n_bits=" + nBits + ", n_q=" + nQ + ")";
 			}
+			if (sig.A.length    !== nBits || sig.B.length    !== nBits ||
+			    sig.Q_M.length  !== nQ    || sig.Q_U.length  !== nQ    ||
+			    sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits) {
+				throw "Triptych: vector length mismatch on serialize";
+			}
+			buf += ("00" + n.toString(16)).slice(-2);
+			for (let p of sig.I_bits) buf += p;
+			for (let p of sig.A)      buf += p;
+			for (let p of sig.B)      buf += p;
+			for (let p of sig.Q_P)    buf += p;
+			for (let p of sig.Q_M)    buf += p;
+			for (let p of sig.Q_U)    buf += p;
+			for (let s of sig.z)      buf += s;
+			for (let s of sig.za)     buf += s;
+			for (let s of sig.zb)     buf += s;
+			buf += sig.f_P;
+			buf += sig.f_M;
+			buf += sig.f_U;
 		}
 
 		let proofs = tx.ct_proofs || [];
@@ -2019,59 +2096,287 @@ export namespace CnTransactions{
 		return {I: I, A: A, B: B, Q: Q, z: z, za: za, zb: zb, f: f};
 	}
 
-	export function mlsag_round_hash(message : string, L1 : string, R1 : string, L2 : string) {
-		return Cn.hash_to_scalar(CnUtils.bintohex("MLSAG-KarboCT-v1") + message + L1 + R1 + L2);
+	// ── Triptych spend proof — see karbowanec's src/crypto/triptych.{h,cpp}
+	// for the protocol algebra, transcript, and soundness sketch. The JS
+	// implementation here mirrors the C++ prover step-for-step; the verifier
+	// lives only on the daemon side.
+
+	export function triptych_log2_ring(ringSize : number) : number {
+		switch (ringSize) {
+			case 1:  return 0;
+			case 4:  return 2;
+			case 8:  return 3;
+			case 16: return 4;
+			default: return -1;
+		}
 	}
 
-	export function mlsag_sign_ct(message : string,
-								  ringPubkeys : string[],
-								  ringCommitments : string[],
-								  pseudoCommitment : string,
-								  trueIndex : number,
-								  spendPrivkey : string,
-								  realBlinding : string,
-								  pseudoBlinding : string,
-								  keyImage : string) : CTInputSignature {
+	export function triptych_ring_size_supported(ringSize : number) : boolean {
+		return triptych_log2_ring(ringSize) >= 0;
+	}
+
+	// Generic version of gk_compute_poly_coeffs. For each k ∈ [0, ringSize),
+	// returns the n+1 coefficients of p_k(X) = product_j (l_j·X + a_j) if
+	// bit_j(k)==1, else ((1−l_j)·X − a_j). Length: ringSize × (n+1).
+	export function triptych_compute_poly_coeffs(bits : number[], a : string[], n : number, ringSize : number) {
+		let coeffs : string[][] = [];
+		let zero = CnVars.Z;
+		let one = CnTransactions.scalar_one();
+		for (let k = 0; k < ringSize; ++k) {
+			let poly : string[] = new Array(n + 1).fill(zero);
+			poly[0] = one;
+			let currentDegree = 0;
+			for (let j = 0; j < n; ++j) {
+				let kBit = (k >> j) & 1;
+				let lBit = bits[j];
+				let factorConst : string;
+				let factorLinear : string;
+				if (kBit === 1) {
+					factorConst = a[j];
+					factorLinear = lBit ? one : zero;
+				} else {
+					factorConst = CnTransactions.sc_neg(a[j]);
+					factorLinear = lBit ? zero : one;
+				}
+				let newPoly : string[] = new Array(n + 1).fill(zero);
+				for (let i = 0; i <= currentDegree + 1; ++i) {
+					let term1 = CnNativeBride.sc_mul(factorConst, poly[i]);
+					if (i > 0) {
+						let term2 = CnNativeBride.sc_mul(factorLinear, poly[i - 1]);
+						newPoly[i] = CnNativeBride.sc_add(term1, term2);
+					} else {
+						newPoly[i] = term1;
+					}
+				}
+				currentDegree++;
+				poly = newPoly;
+			}
+			coeffs[k] = poly;
+		}
+		return coeffs;
+	}
+
+	// Canonical Fiat-Shamir transcript serialization. Matches the C++ daemon's
+	// compute_challenge byte-for-byte: domain || message || ring_size_byte ||
+	// every ring pubkey || every ring commit || pseudo || key image ||
+	// I_bits/A/B (n_bits each) || Q_P/Q_M/Q_U (n_q each). Single funnel —
+	// no ad-hoc hashing at call sites.
+	export function triptych_challenge(
+		message : string,
+		ringSize : number,
+		ringPubkeys : string[],
+		ringCommitments : string[],
+		pseudoCommitment : string,
+		keyImage : string,
+		I_bits : string[],
+		A : string[],
+		B : string[],
+		Q_P : string[],
+		Q_M : string[],
+		Q_U : string[]
+	) : string {
+		// Domain separator distinct from GK ("GK-KarboCT-v2") and MLSAG
+		// ("MLSAG-KarboCT-v1"); see triptych.h.
+		let buf = CnUtils.bintohex("Triptych-KarboCT-v1");
+		buf += message;
+		// One-byte ring size header. ringSize ∈ {1, 4, 8, 16} → "01"/"04"/"08"/"10".
+		buf += ("00" + ringSize.toString(16)).slice(-2);
+		for (let pk of ringPubkeys) buf += pk;
+		for (let c of ringCommitments) buf += c;
+		buf += pseudoCommitment;
+		buf += keyImage;
+		for (let p of I_bits) buf += p;
+		for (let p of A)      buf += p;
+		for (let p of B)      buf += p;
+		for (let p of Q_P)    buf += p;
+		for (let p of Q_M)    buf += p;
+		for (let p of Q_U)    buf += p;
+		return Cn.hash_to_scalar(buf);
+	}
+
+	// Generate a Triptych spend proof. Mirrors src/crypto/triptych.cpp's
+	// triptych_sign in the daemon. Ring sizes 4/8/16 use the full Triptych
+	// construction; ring size 1 uses the Schnorr branch (the v5+ coinbase
+	// carve-out — no decoys, no bit decomposition, just three Schnorr
+	// proofs sharing one Fiat-Shamir challenge).
+	export function triptych_sign_ct(message : string,
+									 ringPubkeys : string[],
+									 ringCommitments : string[],
+									 pseudoCommitment : string,
+									 trueIndex : number,
+									 spendPrivkey : string,
+									 realBlinding : string,
+									 pseudoBlinding : string,
+									 keyImage : string) : CTInputSignature {
 		let ringSize = ringPubkeys.length;
-		if (ringSize === 0 || trueIndex >= ringSize) {
-			throw "Invalid MLSAG ring";
+		if (!CnTransactions.triptych_ring_size_supported(ringSize)) {
+			throw "Triptych: unsupported ring size " + ringSize + " (must be 1, 4, 8, or 16)";
+		}
+		if (trueIndex >= ringSize) {
+			throw "Triptych: true_index out of range";
 		}
 		if (ringCommitments.length !== ringSize) {
-			throw "MLSAG ring pubkeys/commitments mismatch";
+			throw "Triptych: ring pubkeys/commitments size mismatch";
 		}
 
-		let ss : string[][] = [];
-		let c : string[] = [];
-		for (let i = 0; i < ringSize; ++i) {
-			ss[i] = [CnVars.Z, CnVars.Z];
-			c[i] = CnVars.Z;
+		// Blinding-difference witness  z = r_real − r_pseudo.
+		let zWitness = CnNativeBride.sc_sub(realBlinding, pseudoBlinding);
+
+		// Derived rings: M_k = C_k − C', U_k = Hp(P_k). Both verifier and
+		// prover can recompute these from the public ring; we cache them
+		// once per proof.
+		let M : string[] = [];
+		let U : string[] = [];
+		for (let k = 0; k < ringSize; ++k) {
+			M.push(CnUtils.ge_sub(ringCommitments[k], pseudoCommitment));
+			U.push(CnNativeBride.hash_to_ec_2(ringPubkeys[k]));
 		}
 
-		let alpha1 = CnRandom.random_scalar();
-		let alpha2 = CnRandom.random_scalar();
-		let L1 = CnUtils.ge_scalarmult_base(alpha1);
-		let R1 = CnUtils.ge_scalarmult(CnNativeBride.hash_to_ec_2(ringPubkeys[trueIndex]), alpha1);
-		let L2 = CnUtils.ge_scalarmult_base(alpha2);
-		c[(trueIndex + 1) % ringSize] = CnTransactions.mlsag_round_hash(message, L1, R1, L2);
-
-		for (let step = 1; step < ringSize; ++step) {
-			let i = (trueIndex + step) % ringSize;
-			ss[i][0] = CnRandom.random_scalar();
-			ss[i][1] = CnRandom.random_scalar();
-
-			L1 = CnUtils.ge_double_scalarmult_base_vartime(c[i], ringPubkeys[i], ss[i][0]);
-			R1 = CnUtils.ge_double_scalarmult_postcomp_vartime(ss[i][0], ringPubkeys[i], c[i], keyImage);
-			let D = CnUtils.ge_sub(ringCommitments[i], pseudoCommitment);
-			L2 = CnUtils.ge_double_scalarmult_base_vartime(c[i], D, ss[i][1]);
-			c[(i + 1) % ringSize] = CnTransactions.mlsag_round_hash(message, L1, R1, L2);
+		// ── Ring-size-1 (Schnorr) branch ────────────────────────────────
+		// Three independent Schnorr proofs sharing one FS challenge:
+		//   T_P = ρ_P·G        f_P = ρ_P + x_chal·x
+		//   T_M = ρ_M·G        f_M = ρ_M + x_chal·z
+		//   T_U = ρ_U·Hp(P_0)  f_U = ρ_U + x_chal·x
+		if (ringSize === 1) {
+			let rho_P = CnRandom.random_scalar();
+			let rho_M = CnRandom.random_scalar();
+			let rho_U = CnRandom.random_scalar();
+			let T_P = CnUtils.ge_scalarmult_base(rho_P);
+			let T_M = CnUtils.ge_scalarmult_base(rho_M);
+			let T_U = CnUtils.ge_scalarmult(U[0], rho_U);
+			let x_chal = CnTransactions.triptych_challenge(
+				message, ringSize, ringPubkeys, ringCommitments,
+				pseudoCommitment, keyImage,
+				[], [], [], [T_P], [T_M], [T_U]);
+			return {
+				I_bits: [], A: [], B: [],
+				Q_P: [T_P], Q_M: [T_M], Q_U: [T_U],
+				z: [], za: [], zb: [],
+				f_P: CnNativeBride.sc_muladd(x_chal, spendPrivkey, rho_P),
+				f_M: CnNativeBride.sc_muladd(x_chal, zWitness, rho_M),
+				f_U: CnNativeBride.sc_muladd(x_chal, spendPrivkey, rho_U)
+			};
 		}
 
-		let zSecret = CnNativeBride.sc_sub(realBlinding, pseudoBlinding);
-		ss[trueIndex][0] = CnNativeBride.sc_mulsub(c[trueIndex], spendPrivkey, alpha1);
-		ss[trueIndex][1] = CnNativeBride.sc_mulsub(c[trueIndex], zSecret, alpha2);
+		// ── Full Triptych branch (ring size 4/8/16; n ∈ {2,3,4}) ────────
+		let n = CnTransactions.triptych_log2_ring(ringSize);
 
-		return {c0: c[0], ss: ss};
+		// Bit decomposition of trueIndex.
+		let bits : number[] = [];
+		for (let j = 0; j < n; ++j) {
+			bits[j] = (trueIndex >> j) & 1;
+		}
+
+		// Fresh randomness for the bit-commitment proof.
+		let rj : string[] = [];
+		let aj : string[] = [];
+		let sj : string[] = [];
+		let tj : string[] = [];
+		for (let j = 0; j < n; ++j) {
+			rj[j] = CnRandom.random_scalar();
+			aj[j] = CnRandom.random_scalar();
+			sj[j] = CnRandom.random_scalar();
+			tj[j] = CnRandom.random_scalar();
+		}
+
+		// I_bits[j] = r_j·G + l_j·H ; A[j] = s_j·G + a_j·H ;
+		// B[j] = t_j·G + l_j·a_j·H — exactly as in gk_prove.
+		let H = CnTransactions.pedersenH();
+		let I_bits : string[] = [];
+		let A : string[] = [];
+		let B : string[] = [];
+		for (let j = 0; j < n; ++j) {
+			let rG = CnUtils.ge_scalarmult_base(rj[j]);
+			I_bits[j] = bits[j] ? CnUtils.ge_add(rG, H) : rG;
+			let sG = CnUtils.ge_scalarmult_base(sj[j]);
+			let aH = CnUtils.ge_scalarmult(H, aj[j]);
+			A[j] = CnUtils.ge_add(sG, aH);
+			let tG = CnUtils.ge_scalarmult_base(tj[j]);
+			B[j] = bits[j] ? CnUtils.ge_add(tG, aH) : tG;
+		}
+
+		// Selector polynomial coefficients p_{k,m} (m = 0..n−1; the leading
+		// degree-n coefficient is absorbed into f_R below).
+		let polyCoeffs = CnTransactions.triptych_compute_poly_coeffs(bits, aj, n, ringSize);
+
+		// Q polynomials for the three rings. Blinding bases:
+		//   Q_P[m] = ρ_P[m]·G + Σ_k p_{k,m}·P_k   (P-ring, base G)
+		//   Q_M[m] = ρ_M[m]·G + Σ_k p_{k,m}·M_k   (M-ring, base G)
+		//   Q_U[m] = σ_U[m]·I + Σ_k p_{k,m}·U_k   (U-ring, base I — the
+		//                                          Triptych trick that lets
+		//                                          the response carry x⁻¹)
+		let rhoP : string[] = [];
+		let rhoM : string[] = [];
+		let sigmaU : string[] = [];
+		let Q_P : string[] = [];
+		let Q_M : string[] = [];
+		let Q_U : string[] = [];
+		for (let m = 0; m < n; ++m) {
+			rhoP[m] = CnRandom.random_scalar();
+			rhoM[m] = CnRandom.random_scalar();
+			sigmaU[m] = CnRandom.random_scalar();
+			let sumP = CnUtils.ge_scalarmult_base(rhoP[m]);
+			let sumM = CnUtils.ge_scalarmult_base(rhoM[m]);
+			let sumU = CnUtils.ge_scalarmult(keyImage, sigmaU[m]);
+			for (let k = 0; k < ringSize; ++k) {
+				let coeff = polyCoeffs[k][m];
+				if (CnTransactions.is_zero_scalar(coeff)) continue;
+				sumP = CnUtils.ge_add(sumP, CnUtils.ge_scalarmult(ringPubkeys[k], coeff));
+				sumM = CnUtils.ge_add(sumM, CnUtils.ge_scalarmult(M[k], coeff));
+				sumU = CnUtils.ge_add(sumU, CnUtils.ge_scalarmult(U[k], coeff));
+			}
+			Q_P[m] = sumP;
+			Q_M[m] = sumM;
+			Q_U[m] = sumU;
+		}
+
+		// Fiat-Shamir challenge.
+		let x_chal = CnTransactions.triptych_challenge(
+			message, ringSize, ringPubkeys, ringCommitments,
+			pseudoCommitment, keyImage,
+			I_bits, A, B, Q_P, Q_M, Q_U);
+
+		// Bit-commitment responses.
+		let z : string[] = [];
+		let za : string[] = [];
+		let zb : string[] = [];
+		for (let j = 0; j < n; ++j) {
+			z[j] = bits[j] ? CnNativeBride.sc_add(x_chal, aj[j]) : aj[j];
+			za[j] = CnNativeBride.sc_muladd(rj[j], x_chal, sj[j]);
+			zb[j] = CnNativeBride.sc_muladd(rj[j], CnNativeBride.sc_sub(x_chal, z[j]), tj[j]);
+		}
+
+		// Powers of x_chal up to X^n.
+		let xPow : string[] = [CnTransactions.scalar_one()];
+		xPow[1] = x_chal;
+		for (let i = 2; i <= n; ++i) {
+			xPow[i] = CnNativeBride.sc_mul(xPow[i - 1], x_chal);
+		}
+
+		// Final responses:
+		//   f_P = x · x_chal^n − Σ_m ρ_P[m]·x_chal^m
+		//   f_M = z · x_chal^n − Σ_m ρ_M[m]·x_chal^m
+		//   f_U = x⁻¹ · x_chal^n − Σ_m σ_U[m]·x_chal^m
+		// f_U is the only place x⁻¹ enters the protocol — one Fermat
+		// inversion per proof, no leak through the verifier's algebra.
+		let xInv = CnNativeBride.sc_invert(spendPrivkey);
+		let f_P = CnNativeBride.sc_mul(spendPrivkey, xPow[n]);
+		let f_M = CnNativeBride.sc_mul(zWitness, xPow[n]);
+		let f_U = CnNativeBride.sc_mul(xInv, xPow[n]);
+		for (let m = 0; m < n; ++m) {
+			f_P = CnNativeBride.sc_sub(f_P, CnNativeBride.sc_mul(rhoP[m], xPow[m]));
+			f_M = CnNativeBride.sc_sub(f_M, CnNativeBride.sc_mul(rhoM[m], xPow[m]));
+			f_U = CnNativeBride.sc_sub(f_U, CnNativeBride.sc_mul(sigmaU[m], xPow[m]));
+		}
+
+		return {
+			I_bits, A, B,
+			Q_P, Q_M, Q_U,
+			z, za, zb,
+			f_P, f_M, f_U
+		};
 	}
+
 
 	export function generate_signature(hash : string, pub : string, sec : string) {
 		let k = "";
@@ -2788,7 +3093,7 @@ export namespace CnTransactions{
 
 		tx.ct_signatures = [];
 		for (let i = 0; i < sources.length; ++i) {
-			tx.ct_signatures.push(CnTransactions.mlsag_sign_ct(
+			tx.ct_signatures.push(CnTransactions.triptych_sign_ct(
 				signingHash,
 				(tx.vin[i].ring_pubkeys || []),
 				(tx.vin[i].ring_commits || []),
