@@ -1758,35 +1758,46 @@ export namespace CnTransactions{
 		check_ct_array_size(signatures.length, CT_MAX_INPUTS, "ct_signatures");
 		buf += CnUtils.encode_varint(signatures.length);
 		// Per-input Triptych spend proof — wire format:
-		//   byte         n                  (0 for Schnorr branch, else 2/3/4)
+		//   byte         n                  (0xFF empty slot, 0 Schnorr branch,
+		//                                    or 2/3/4 full Triptych)
 		//   6 × n_bits   I_bits, A, B,
 		//   3 × n_q      Q_P, Q_M, Q_U      (n_q = max(1, n) — the Schnorr
 		//                                    branch keeps one entry per Q
 		//                                    array for the nonce commits)
 		//   3 × n_bits   z, za, zb
 		//   3            f_P, f_M, f_U
-		// where n_bits = n (0 when n=0).
+		// where n_bits = n (0 when n=0). The empty-slot sentinel (n=0xFF)
+		// marks a v2 KeyInput, whose authorization lives in tx.signatures[i]
+		// as a legacy ring signature — no body bytes follow the header.
 		for (let sig of signatures) {
 			let nBits = sig.I_bits.length;
 			let nQ = sig.Q_P.length;
 			// Recover n from the proof shape.
+			//   nBits === 0 && nQ === 0                    → empty slot (KeyInput), n=0xFF
 			//   nBits === 0 && nQ === 1                    → Schnorr branch, n=0
 			//   nBits ∈ {2,3,4} && nQ === nBits            → full Triptych
 			// anything else is ill-formed and rejected before reaching the wire.
 			let n : number;
-			if (nBits === 0 && nQ === 1) {
+			if (nBits === 0 && nQ === 0 &&
+			    sig.A.length === 0 && sig.B.length === 0 &&
+			    sig.Q_M.length === 0 && sig.Q_U.length === 0 &&
+			    sig.z.length === 0 && sig.za.length === 0 && sig.zb.length === 0) {
+				n = 0xFF;
+			} else if (nBits === 0 && nQ === 1) {
 				n = 0;
 			} else if ((nBits === 2 || nBits === 3 || nBits === 4) && nQ === nBits) {
 				n = nBits;
 			} else {
 				throw "Triptych: invalid proof shape on serialize (n_bits=" + nBits + ", n_q=" + nQ + ")";
 			}
-			if (sig.A.length    !== nBits || sig.B.length    !== nBits ||
-			    sig.Q_M.length  !== nQ    || sig.Q_U.length  !== nQ    ||
-			    sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits) {
+			if (n !== 0xFF &&
+			    (sig.A.length    !== nBits || sig.B.length    !== nBits ||
+			     sig.Q_M.length  !== nQ    || sig.Q_U.length  !== nQ    ||
+			     sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits)) {
 				throw "Triptych: vector length mismatch on serialize";
 			}
 			buf += ("00" + n.toString(16)).slice(-2);
+			if (n === 0xFF) continue; // empty slot: header only, no body
 			for (let p of sig.I_bits) buf += p;
 			for (let p of sig.A)      buf += p;
 			for (let p of sig.B)      buf += p;
@@ -1854,9 +1865,13 @@ export namespace CnTransactions{
 		buf += tx.extra;
 
 		if (!headeronly) {
-			if (tx.version === TRANSACTION_VERSION_CT) {
-				buf += CnTransactions.serialize_ct_body(tx);
-			} else {
+			// Per-input legacy ring signatures run for v1 AND v2. v2 mixed mode
+			// uses this section for KeyInput slots; ConfidentialInput slots leave
+			// tx.signatures[i] empty (zero bytes written), so the on-wire byte
+			// stream for a pure-CT v2 tx (all ConfidentialInputs) matches the
+			// pre-mixed-mode layout exactly.
+			let writeLegacySigs = tx.signatures && tx.signatures.length > 0;
+			if (writeLegacySigs) {
 				if (tx.vin.length !== tx.signatures.length) {
 					throw "Signatures length != vin length";
 				}
@@ -1865,6 +1880,11 @@ export namespace CnTransactions{
 						buf += tx.signatures[i][j];
 					}
 				}
+			} else if (tx.version !== TRANSACTION_VERSION_CT) {
+				throw "Signatures length != vin length";
+			}
+			if (tx.version === TRANSACTION_VERSION_CT) {
+				buf += CnTransactions.serialize_ct_body(tx);
 			}
 		}
 		return buf;
@@ -2908,15 +2928,15 @@ export namespace CnTransactions{
 		let inContexts : CnTransactions.Ephemeral[] = [];
 		let pseudoBlindings : string[] = [];
 		let pseudoCommitments : string[] = [];
+		// Per-source flag: real spend is a transparent KeyOutput. Such inputs
+		// emit a v2 KeyInput (legacy ring sig in tx.signatures[i]) so the
+		// visible amount enters the CT pool. Confidential reals stay as
+		// ConfidentialInput + Triptych proof.
+		let sourceIsTransparent : boolean[] = [];
 
 		for (let i = 0; i < sources.length; ++i) {
 			inputs_money = inputs_money.add(sources[i].amount);
 			inContexts.push(sources[i].in_ephemeral);
-
-			let pseudoBlinding = CnRandom.random_scalar();
-			let pseudoCommitment = CnTransactions.commit(CnUtils.d2s(new JSBigInt(sources[i].amount).toString()), pseudoBlinding);
-			pseudoBlindings.push(pseudoBlinding);
-			pseudoCommitments.push(pseudoCommitment);
 
 			// Build per-member ring references. Each output is self-describing:
 			// transparent → its real amount; confidential → CT sentinel.
@@ -2941,7 +2961,7 @@ export namespace CnTransactions{
 
 			// Canonical ordering: members must be sorted by (amount, outputIndex)
 			// strictly ascending. We permute the parallel arrays AND remap
-			// sources[i].real_out + sources[i].outputs so subsequent MLSAG signing
+			// sources[i].real_out + sources[i].outputs so subsequent signing
 			// (which still reads sources[i].real_out) lines up with the on-chain
 			// ring order.
 			let memberPerm = ringMembers.map((m, idx) => idx);
@@ -2960,14 +2980,60 @@ export namespace CnTransactions{
 				throw "CT input lost real ring member during canonicalisation at index " + i;
 			}
 
-			tx.vin.push({
-				type: "confidential_input",
-				ring_members: ringMembers,
-				ring_pubkeys: ringPubkeys,
-				ring_commits: ringCommits,
-				pseudo_commit: pseudoCommitment,
-				k_image: sources[i].key_image
-			});
+			// Decide input shape from the real ring member's bucket. CT_CONFIDENTIAL_OUTPUT_AMOUNT
+			// signals a ConfidentialOutput on-chain; anything else is a transparent KeyOutput.
+			let realBucket = ringMembers[sources[i].real_out].amount;
+			let isTransparent = realBucket !== CT_CONFIDENTIAL_OUTPUT_AMOUNT && realBucket !== "" + CT_CONFIDENTIAL_OUTPUT_AMOUNT;
+			sourceIsTransparent.push(isTransparent);
+
+			if (isTransparent) {
+				// All ring members must share the same transparent bucket as the real spend —
+				// the on-chain verifier resolves the ring via scanOutputKeysForIndexes which
+				// only accepts KeyOutput targets in a single amount bucket.
+				for (let j = 0; j < ringMembers.length; ++j) {
+					if (ringMembers[j].amount !== realBucket) {
+						throw "Transparent CT input " + i + " has cross-bucket ring member at slot " + j;
+					}
+				}
+				// Pseudo-commitment is deterministic for transparent: amount*H + 0*G.
+				// Blinding stays zero so the excess kernel gets no contribution from this slot
+				// (matches the consensus verifier's reconstruction).
+				let zeroBlinding = CnVars.Z;
+				let pseudoCommitment = CnTransactions.commit(CnUtils.d2s(new JSBigInt(sources[i].amount).toString()), zeroBlinding);
+				pseudoBlindings.push(zeroBlinding);
+				pseudoCommitments.push(pseudoCommitment);
+
+				// Emit KeyInput. Offsets are relative-encoded from the sorted absolute
+				// outputIndex list (same encoding as v1 plain txs).
+				let absOffsets = ringMembers.map(m => m.output_index);
+				let relOffsets = CnTransactions.abs_to_rel_offsets(absOffsets);
+				tx.vin.push({
+					type: "input_to_key",
+					amount: "" + sources[i].amount,
+					k_image: sources[i].key_image,
+					key_offsets: relOffsets,
+					// Keep ring metadata around in-memory so the signing pass below
+					// can look up ringPubkeys without re-sorting; not part of the
+					// on-wire shape for input_to_key.
+					ring_members: ringMembers,
+					ring_pubkeys: ringPubkeys,
+					ring_commits: ringCommits,
+				});
+			} else {
+				let pseudoBlinding = CnRandom.random_scalar();
+				let pseudoCommitment = CnTransactions.commit(CnUtils.d2s(new JSBigInt(sources[i].amount).toString()), pseudoBlinding);
+				pseudoBlindings.push(pseudoBlinding);
+				pseudoCommitments.push(pseudoCommitment);
+
+				tx.vin.push({
+					type: "confidential_input",
+					ring_members: ringMembers,
+					ring_pubkeys: ringPubkeys,
+					ring_commits: ringCommits,
+					pseudo_commit: pseudoCommitment,
+					k_image: sources[i].key_image
+				});
+			}
 		}
 
 		let txkey = CnTransactions.generate_deterministic_tx_keys(tx.vin, keys.view.sec);
@@ -3092,33 +3158,60 @@ export namespace CnTransactions{
 		}
 
 		tx.ct_signatures = [];
-		// Triptych signing is the dominant per-input CT cost (each input
-		// runs ~6 × log2(ring) point multiplications plus a Fermat scalar
-		// inversion). Log per-input wall-clock so testnet operators can
-		// see what the user is waiting for; the totals also surface any
-		// pathological inputs from real-world tx shapes.
+		tx.signatures = [];
+		// Per-input signing dispatch:
+		//   transparent (KeyInput)        → legacy ring sig in tx.signatures[i];
+		//                                   tx.ct_signatures[i] is an empty sentinel slot.
+		//   confidential (ConfidentialInput) → Triptych proof in tx.ct_signatures[i];
+		//                                   tx.signatures[i] is an empty array.
+		// Triptych signing dominates the per-input cost; log wall-clock for each.
 		const tStart = performance.now();
 		let tLast = tStart;
 		for (let i = 0; i < sources.length; ++i) {
-			tx.ct_signatures.push(CnTransactions.triptych_sign_ct(
-				signingHash,
-				(tx.vin[i].ring_pubkeys || []),
-				(tx.vin[i].ring_commits || []),
-				pseudoCommitments[i],
-				sources[i].real_out,
-				inContexts[i].sec,
-				inContexts[i].mask,
-				pseudoBlindings[i],
-				tx.vin[i].k_image
-			));
-			const tNow = performance.now();
-			console.debug("[Triptych] input " + i +
-				" ring=" + (tx.vin[i].ring_pubkeys || []).length +
-				" signed in " + (tNow - tLast).toFixed(1) + " ms");
-			tLast = tNow;
+			if (sourceIsTransparent[i]) {
+				let ringPubkeys = (tx.vin[i].ring_pubkeys || []);
+				let sigs = CnNativeBride.generate_ring_signature(
+					signingHash,
+					tx.vin[i].k_image,
+					ringPubkeys,
+					inContexts[i].sec,
+					sources[i].real_out
+				);
+				tx.signatures.push(sigs);
+				// Empty Triptych slot (serializer encodes as n=0xFF, 1 byte on-wire).
+				tx.ct_signatures.push({
+					I_bits: [], A: [], B: [],
+					Q_P: [], Q_M: [], Q_U: [],
+					z: [], za: [], zb: [],
+					f_P: CnVars.Z, f_M: CnVars.Z, f_U: CnVars.Z
+				});
+				const tNow = performance.now();
+				console.debug("[KeyInput] input " + i +
+					" ring=" + ringPubkeys.length +
+					" legacy-sig in " + (tNow - tLast).toFixed(1) + " ms");
+				tLast = tNow;
+			} else {
+				tx.ct_signatures.push(CnTransactions.triptych_sign_ct(
+					signingHash,
+					(tx.vin[i].ring_pubkeys || []),
+					(tx.vin[i].ring_commits || []),
+					pseudoCommitments[i],
+					sources[i].real_out,
+					inContexts[i].sec,
+					inContexts[i].mask,
+					pseudoBlindings[i],
+					tx.vin[i].k_image
+				));
+				tx.signatures.push([]);
+				const tNow = performance.now();
+				console.debug("[Triptych] input " + i +
+					" ring=" + (tx.vin[i].ring_pubkeys || []).length +
+					" signed in " + (tNow - tLast).toFixed(1) + " ms");
+				tLast = tNow;
+			}
 		}
 		if (sources.length > 1) {
-			console.debug("[Triptych] " + sources.length +
+			console.debug("[v2-sign] " + sources.length +
 				" inputs signed in " + (tLast - tStart).toFixed(1) + " ms total");
 		}
 
