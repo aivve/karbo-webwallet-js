@@ -1570,12 +1570,11 @@ export namespace CnTransactions{
 	};
 
 	// Triptych spend proof. Vector lengths follow the on-wire rule:
-	//   n = 0 (ring size 1, Schnorr branch — v5+ coinbase carve-out)
-	//     I_bits, A, B, z, za, zb : empty
-	//     Q_P, Q_M, Q_U           : one entry each (Schnorr nonce commits)
 	//   n ∈ {2, 3, 4} (ring sizes 4 / 8 / 16, full Triptych)
 	//     I_bits, A, B, Q_P, Q_M, Q_U, z, za, zb : n entries each
-	// f_P, f_M, f_U are always present.
+	// f_P, f_M, f_U are always present. n=0 / n=1 are reserved as invalid
+	// (the old n=0 Schnorr branch for ring size 1 was unsound and removed
+	// from consensus; coinbase shielding goes through v2 KeyInput now).
 	export type CTInputSignature = {
 		I_bits:string[],
 		A:string[],
@@ -1758,23 +1757,22 @@ export namespace CnTransactions{
 		check_ct_array_size(signatures.length, CT_MAX_INPUTS, "ct_signatures");
 		buf += CnUtils.encode_varint(signatures.length);
 		// Per-input Triptych spend proof — wire format:
-		//   byte         n                  (0xFF empty slot, 0 Schnorr branch,
-		//                                    or 2/3/4 full Triptych)
-		//   6 × n_bits   I_bits, A, B,
-		//   3 × n_q      Q_P, Q_M, Q_U      (n_q = max(1, n) — the Schnorr
-		//                                    branch keeps one entry per Q
-		//                                    array for the nonce commits)
-		//   3 × n_bits   z, za, zb
+		//   byte         n                  (0xFF empty slot, or 2/3/4 full
+		//                                    Triptych at ring size 4/8/16)
+		//   3 × n        I_bits, A, B
+		//   3 × n        Q_P, Q_M, Q_U
+		//   3 × n        z, za, zb
 		//   3            f_P, f_M, f_U
-		// where n_bits = n (0 when n=0). The empty-slot sentinel (n=0xFF)
-		// marks a v2 KeyInput, whose authorization lives in tx.signatures[i]
-		// as a legacy ring signature — no body bytes follow the header.
+		// The empty-slot sentinel (n=0xFF) marks a v2 KeyInput, whose
+		// authorization lives in tx.signatures[i] as a legacy ring
+		// signature — no body bytes follow the header. n=0 / n=1 are
+		// reserved as invalid (the old n=0 Schnorr branch didn't bind the
+		// same x in P=xG and I=x·Hp(P)).
 		for (let sig of signatures) {
 			let nBits = sig.I_bits.length;
 			let nQ = sig.Q_P.length;
 			// Recover n from the proof shape.
 			//   nBits === 0 && nQ === 0                    → empty slot (KeyInput), n=0xFF
-			//   nBits === 0 && nQ === 1                    → Schnorr branch, n=0
 			//   nBits ∈ {2,3,4} && nQ === nBits            → full Triptych
 			// anything else is ill-formed and rejected before reaching the wire.
 			let n : number;
@@ -1783,8 +1781,6 @@ export namespace CnTransactions{
 			    sig.Q_M.length === 0 && sig.Q_U.length === 0 &&
 			    sig.z.length === 0 && sig.za.length === 0 && sig.zb.length === 0) {
 				n = 0xFF;
-			} else if (nBits === 0 && nQ === 1) {
-				n = 0;
 			} else if ((nBits === 2 || nBits === 3 || nBits === 4) && nQ === nBits) {
 				n = nBits;
 			} else {
@@ -2123,7 +2119,6 @@ export namespace CnTransactions{
 
 	export function triptych_log2_ring(ringSize : number) : number {
 		switch (ringSize) {
-			case 1:  return 0;
 			case 4:  return 2;
 			case 8:  return 3;
 			case 16: return 4;
@@ -2131,8 +2126,13 @@ export namespace CnTransactions{
 		}
 	}
 
+	// Triptych supports power-of-two ring sizes 4, 8, 16. Ring size 1 used
+	// to take a Schnorr-branch carve-out for v5+ coinbase, but that proof
+	// shape did not bind the same x in P=xG and I=x·Hp(P), so it was
+	// removed from consensus. Phase B routes coinbase shielding through
+	// v2 KeyInput with a legacy ring signature instead.
 	export function triptych_ring_size_supported(ringSize : number) : boolean {
-		return triptych_log2_ring(ringSize) >= 0;
+		return triptych_log2_ring(ringSize) > 0;
 	}
 
 	// Generic version of gk_compute_poly_coeffs. For each k ∈ [0, ringSize),
@@ -2230,7 +2230,7 @@ export namespace CnTransactions{
 									 keyImage : string) : CTInputSignature {
 		let ringSize = ringPubkeys.length;
 		if (!CnTransactions.triptych_ring_size_supported(ringSize)) {
-			throw "Triptych: unsupported ring size " + ringSize + " (must be 1, 4, 8, or 16)";
+			throw "Triptych: unsupported ring size " + ringSize + " (must be 4, 8, or 16)";
 		}
 		if (trueIndex >= ringSize) {
 			throw "Triptych: true_index out of range";
@@ -2252,31 +2252,12 @@ export namespace CnTransactions{
 			U.push(CnNativeBride.hash_to_ec_2(ringPubkeys[k]));
 		}
 
-		// ── Ring-size-1 (Schnorr) branch ────────────────────────────────
-		// Three independent Schnorr proofs sharing one FS challenge:
-		//   T_P = ρ_P·G        f_P = ρ_P + x_chal·x
-		//   T_M = ρ_M·G        f_M = ρ_M + x_chal·z
-		//   T_U = ρ_U·Hp(P_0)  f_U = ρ_U + x_chal·x
-		if (ringSize === 1) {
-			let rho_P = CnRandom.random_scalar();
-			let rho_M = CnRandom.random_scalar();
-			let rho_U = CnRandom.random_scalar();
-			let T_P = CnUtils.ge_scalarmult_base(rho_P);
-			let T_M = CnUtils.ge_scalarmult_base(rho_M);
-			let T_U = CnUtils.ge_scalarmult(U[0], rho_U);
-			let x_chal = CnTransactions.triptych_challenge(
-				message, ringSize, ringPubkeys, ringCommitments,
-				pseudoCommitment, keyImage,
-				[], [], [], [T_P], [T_M], [T_U]);
-			return {
-				I_bits: [], A: [], B: [],
-				Q_P: [T_P], Q_M: [T_M], Q_U: [T_U],
-				z: [], za: [], zb: [],
-				f_P: CnNativeBride.sc_muladd(x_chal, spendPrivkey, rho_P),
-				f_M: CnNativeBride.sc_muladd(x_chal, zWitness, rho_M),
-				f_U: CnNativeBride.sc_muladd(x_chal, spendPrivkey, rho_U)
-			};
-		}
+		// Ring size 1 used to take a Schnorr-branch carve-out here, but
+		// the simpler "two independent Schnorr proofs" shape did not bind
+		// the same x in P=xG and I=x·Hp(P), so a holder could forge fresh
+		// key images for the same spend. Coinbase shielding now goes
+		// through v2 KeyInput with a sound single-member legacy ring sig
+		// (Phase B), and ConfidentialInput never needs ring size 1.
 
 		// ── Full Triptych branch (ring size 4/8/16; n ∈ {2,3,4}) ────────
 		let n = CnTransactions.triptych_log2_ring(ringSize);
