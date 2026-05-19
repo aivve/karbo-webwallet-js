@@ -1662,6 +1662,14 @@ export namespace CnTransactions{
 		},
 	}
 
+	// Per-input authorization, parallel to tx.vin. Each slot is one of:
+	//   null / undefined       — BaseInput (coinbase, no signature)
+	//   string[]               — KeyInput legacy ring signature, one hex sig per ring member
+	//   CTInputSignature       — ConfidentialInput Triptych spend proof
+	// The variant alternative is implicit from tx.vin[i].type, so no per-slot
+	// tag is written on the wire.
+	export type InputSignature = string[] | CTInputSignature | null;
+
 	export type Transaction = {
 		unlock_time: number,
 		version: number,
@@ -1670,11 +1678,10 @@ export namespace CnTransactions{
 		vin: Vin[],
 		vout: Vout[],
 		rct_signatures:RctSignature,
-		ct_signatures?:CTInputSignature[],
 		ct_proofs?:CTOutputProof[],
 		kernel?:TransactionKernel,
 		fee?:any,
-		signatures:any[],
+		signatures:InputSignature[],
 	};
 
 	export function serialize_input(input : Vin) {
@@ -1751,63 +1758,39 @@ export namespace CnTransactions{
 		return buf;
 	}
 
+	// Serialize one Triptych proof body. Header byte n ∈ {2,3,4} (ring 4/8/16)
+	// followed by 9 × n point/scalar arrays and 3 final scalars. Empty-slot
+	// signalling for v2 KeyInput slots is now done at the Transaction level
+	// via the per-input variant — no n=0xFF sentinel here.
+	function serialize_ct_input_sig(sig : CTInputSignature) : string {
+		let nBits = sig.I_bits.length;
+		let nQ = sig.Q_P.length;
+		if (!((nBits === 2 || nBits === 3 || nBits === 4) && nQ === nBits)) {
+			throw "Triptych: invalid proof shape on serialize (n_bits=" + nBits + ", n_q=" + nQ + ")";
+		}
+		if (sig.A.length    !== nBits || sig.B.length    !== nBits ||
+		    sig.Q_M.length  !== nBits || sig.Q_U.length  !== nBits ||
+		    sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits) {
+			throw "Triptych: vector length mismatch on serialize";
+		}
+		let buf = ("00" + nBits.toString(16)).slice(-2);
+		for (let p of sig.I_bits) buf += p;
+		for (let p of sig.A)      buf += p;
+		for (let p of sig.B)      buf += p;
+		for (let p of sig.Q_P)    buf += p;
+		for (let p of sig.Q_M)    buf += p;
+		for (let p of sig.Q_U)    buf += p;
+		for (let s of sig.z)      buf += s;
+		for (let s of sig.za)     buf += s;
+		for (let s of sig.zb)     buf += s;
+		buf += sig.f_P;
+		buf += sig.f_M;
+		buf += sig.f_U;
+		return buf;
+	}
+
 	export function serialize_ct_body(tx : CnTransactions.Transaction) {
 		let buf = "";
-		let signatures = tx.ct_signatures || [];
-		check_ct_array_size(signatures.length, CT_MAX_INPUTS, "ct_signatures");
-		buf += CnUtils.encode_varint(signatures.length);
-		// Per-input Triptych spend proof — wire format:
-		//   byte         n                  (0xFF empty slot, or 2/3/4 full
-		//                                    Triptych at ring size 4/8/16)
-		//   3 × n        I_bits, A, B
-		//   3 × n        Q_P, Q_M, Q_U
-		//   3 × n        z, za, zb
-		//   3            f_P, f_M, f_U
-		// The empty-slot sentinel (n=0xFF) marks a v2 KeyInput, whose
-		// authorization lives in tx.signatures[i] as a legacy ring
-		// signature — no body bytes follow the header. n=0 / n=1 are
-		// reserved as invalid (the old n=0 Schnorr branch didn't bind the
-		// same x in P=xG and I=x·Hp(P)).
-		for (let sig of signatures) {
-			let nBits = sig.I_bits.length;
-			let nQ = sig.Q_P.length;
-			// Recover n from the proof shape.
-			//   nBits === 0 && nQ === 0                    → empty slot (KeyInput), n=0xFF
-			//   nBits ∈ {2,3,4} && nQ === nBits            → full Triptych
-			// anything else is ill-formed and rejected before reaching the wire.
-			let n : number;
-			if (nBits === 0 && nQ === 0 &&
-			    sig.A.length === 0 && sig.B.length === 0 &&
-			    sig.Q_M.length === 0 && sig.Q_U.length === 0 &&
-			    sig.z.length === 0 && sig.za.length === 0 && sig.zb.length === 0) {
-				n = 0xFF;
-			} else if ((nBits === 2 || nBits === 3 || nBits === 4) && nQ === nBits) {
-				n = nBits;
-			} else {
-				throw "Triptych: invalid proof shape on serialize (n_bits=" + nBits + ", n_q=" + nQ + ")";
-			}
-			if (n !== 0xFF &&
-			    (sig.A.length    !== nBits || sig.B.length    !== nBits ||
-			     sig.Q_M.length  !== nQ    || sig.Q_U.length  !== nQ    ||
-			     sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits)) {
-				throw "Triptych: vector length mismatch on serialize";
-			}
-			buf += ("00" + n.toString(16)).slice(-2);
-			if (n === 0xFF) continue; // empty slot: header only, no body
-			for (let p of sig.I_bits) buf += p;
-			for (let p of sig.A)      buf += p;
-			for (let p of sig.B)      buf += p;
-			for (let p of sig.Q_P)    buf += p;
-			for (let p of sig.Q_M)    buf += p;
-			for (let p of sig.Q_U)    buf += p;
-			for (let s of sig.z)      buf += s;
-			for (let s of sig.za)     buf += s;
-			for (let s of sig.zb)     buf += s;
-			buf += sig.f_P;
-			buf += sig.f_M;
-			buf += sig.f_U;
-		}
-
 		let proofs = tx.ct_proofs || [];
 		check_ct_array_size(proofs.length, CT_MAX_OUTPUTS, "ct_proofs");
 		buf += CnUtils.encode_varint(proofs.length);
@@ -1861,23 +1844,37 @@ export namespace CnTransactions{
 		buf += tx.extra;
 
 		if (!headeronly) {
-			// Per-input legacy ring signatures run for v1 AND v2. v2 mixed mode
-			// uses this section for KeyInput slots; ConfidentialInput slots leave
-			// tx.signatures[i] empty (zero bytes written), so the on-wire byte
-			// stream for a pure-CT v2 tx (all ConfidentialInputs) matches the
-			// pre-mixed-mode layout exactly.
-			let writeLegacySigs = tx.signatures && tx.signatures.length > 0;
-			if (writeLegacySigs) {
-				if (tx.vin.length !== tx.signatures.length) {
-					throw "Signatures length != vin length";
-				}
-				for (let i = 0; i < tx.vin.length; i++) {
-					for (let j = 0; j < tx.signatures[i].length; j++) {
-						buf += tx.signatures[i][j];
-					}
-				}
-			} else if (tx.version !== TRANSACTION_VERSION_CT) {
+			// Per-input authorization, parallel to tx.vin. Variant shape
+			// selected by vin[i].type:
+			//   input_to_gen / coinbase  → no bytes
+			//   input_to_key             → ring sig: hex string per ring member
+			//   confidential_input       → Triptych proof body
+			const isCoinbaseOnly = tx.vin.length === 1 && tx.vin[0].type === "input_to_gen";
+			const sigs = tx.signatures || [];
+			if (!isCoinbaseOnly && sigs.length !== tx.vin.length) {
 				throw "Signatures length != vin length";
+			}
+			for (let i = 0; i < tx.vin.length; i++) {
+				const vinType = tx.vin[i].type;
+				if (vinType === "input_to_gen") {
+					continue;
+				}
+				const slot = sigs[i];
+				if (vinType === "input_to_key") {
+					if (!Array.isArray(slot)) {
+						throw "Input " + i + " expected legacy ring signature (string[])";
+					}
+					for (let j = 0; j < slot.length; j++) {
+						buf += slot[j];
+					}
+				} else if (vinType === "confidential_input" || vinType === "input_to_confidential") {
+					if (!slot || Array.isArray(slot)) {
+						throw "Input " + i + " expected Triptych proof (CTInputSignature)";
+					}
+					buf += serialize_ct_input_sig(slot as CTInputSignature);
+				} else {
+					throw "Unhandled vin type for authorization: " + vinType;
+				}
 			}
 			if (tx.version === TRANSACTION_VERSION_CT) {
 				buf += CnTransactions.serialize_ct_body(tx);
@@ -2871,7 +2868,6 @@ export namespace CnTransactions{
 				txnFee:'',
 				type:0,
 			},
-			ct_signatures: [],
 			ct_proofs: [],
 			kernel: {
 				excessCommitment: CnVars.I,
@@ -3138,13 +3134,10 @@ export namespace CnTransactions{
 			tx.ct_proofs.push(CnTransactions.gk_prove(outputCommitments[i], outputAmounts[i], outputBlindings[i], signingHash));
 		}
 
-		tx.ct_signatures = [];
 		tx.signatures = [];
-		// Per-input signing dispatch:
-		//   transparent (KeyInput)        → legacy ring sig in tx.signatures[i];
-		//                                   tx.ct_signatures[i] is an empty sentinel slot.
-		//   confidential (ConfidentialInput) → Triptych proof in tx.ct_signatures[i];
-		//                                   tx.signatures[i] is an empty array.
+		// Per-input signing dispatch — one variant slot per input:
+		//   transparent (KeyInput)        → string[] (legacy ring sig per ring member)
+		//   confidential (ConfidentialInput) → CTInputSignature (Triptych proof)
 		// Triptych signing dominates the per-input cost; log wall-clock for each.
 		const tStart = performance.now();
 		let tLast = tStart;
@@ -3159,20 +3152,13 @@ export namespace CnTransactions{
 					sources[i].real_out
 				);
 				tx.signatures.push(sigs);
-				// Empty Triptych slot (serializer encodes as n=0xFF, 1 byte on-wire).
-				tx.ct_signatures.push({
-					I_bits: [], A: [], B: [],
-					Q_P: [], Q_M: [], Q_U: [],
-					z: [], za: [], zb: [],
-					f_P: CnVars.Z, f_M: CnVars.Z, f_U: CnVars.Z
-				});
 				const tNow = performance.now();
 				console.debug("[KeyInput] input " + i +
 					" ring=" + ringPubkeys.length +
 					" legacy-sig in " + (tNow - tLast).toFixed(1) + " ms");
 				tLast = tNow;
 			} else {
-				tx.ct_signatures.push(CnTransactions.triptych_sign_ct(
+				tx.signatures.push(CnTransactions.triptych_sign_ct(
 					signingHash,
 					(tx.vin[i].ring_pubkeys || []),
 					(tx.vin[i].ring_commits || []),
@@ -3183,7 +3169,6 @@ export namespace CnTransactions{
 					pseudoBlindings[i],
 					tx.vin[i].k_image
 				));
-				tx.signatures.push([]);
 				const tNow = performance.now();
 				console.debug("[Triptych] input " + i +
 					" ring=" + (tx.vin[i].ring_pubkeys || []).length +
