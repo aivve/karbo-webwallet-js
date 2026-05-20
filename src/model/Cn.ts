@@ -159,10 +159,24 @@ export namespace CnRandom{
 		return Mnemonic.mn_random(64);
 	}
 
+	// Generate a 512-bit / 128-char / 64-byte crypto random. Used as the
+	// entropy source for unbiased scalar reduction in random_scalar().
+	export function rand_64() {
+		return Mnemonic.mn_random(512);
+	}
+
+	// Sample a uniform scalar in [0, L). Draws 64 bytes of entropy and
+	// reduces mod L — the standard unbiased pattern. The old implementation
+	// reduced only 32 bytes (sc_reduce32), which is biased because L ≈ 2^252
+	// is close to 2^256: values in the low half of [0, L) get hit one more
+	// time than values in [2^256 − k·L, L), giving ~1/16 non-uniformity at
+	// the high end. That bias propagated into EVERY scalar this webwallet
+	// generates — pseudo blindings, Triptych proof randomness (rj/aj/sj/tj,
+	// rhoP/rhoM/sigmaU), GK proof randomness (rj/a/s/t/rho), ring signature
+	// nonces, Schnorr nonces. The fix mirrors random_scalar() in the
+	// daemon's src/crypto/triptych.cpp and src/crypto/gk_proof.cpp.
 	export function random_scalar() {
-		//let rand = this.sc_reduce(mn_random(64 * 8));
-		//return rand.slice(0, STRUCT_SIZES.EC_SCALAR * 2);
-		return CnNativeBride.sc_reduce32(CnRandom.rand_32());
+		return CnNativeBride.sc_reduce(CnRandom.rand_64());
 	}
 }
 
@@ -470,6 +484,27 @@ export namespace CnNativeBride{
 		let output = Module.HEAPU8.subarray(mem, mem + 32);
 		Module._free(mem);
 		return CnUtils.bintohex(output);
+	}
+
+	// 64-byte → 32-byte modular reduction. The unbiased way to sample a
+	// uniform scalar in [0, L): sc_reduce32 takes 32 bytes which are
+	// non-uniform after reduction (L ≈ 2^252 < 2^256 means values in
+	// [0, 2^256 − k·L) get hit one more time than the tail). 64 bytes of
+	// entropy + sc_reduce gives effectively uniform output (bias ~2^-252).
+	// Mirrors random_scalar() in the daemon's triptych.cpp / gk_proof.cpp.
+	export function sc_reduce(hex64 : string) {
+		let input = CnUtils.hextobin(hex64);
+		if (input.length !== 64) {
+			throw "Invalid input length (sc_reduce expects 64 bytes)";
+		}
+		let mem = Module._malloc(64);
+		Module.HEAPU8.set(input, mem);
+		Module.ccall('sc_reduce', 'void', ['number'], [mem]);
+		// sc_reduce writes the 32-byte reduced scalar into the first 32 bytes.
+		let output = Module.HEAPU8.subarray(mem, mem + 32);
+		let hexOut = CnUtils.bintohex(output);
+		Module._free(mem);
+		return hexOut;
 	}
 
 	export function derive_secret_key(derivation : string, out_index : number, sec : string) {
