@@ -20,6 +20,7 @@ import {DestructableView} from "../lib/numbersLab/DestructableView";
 import {Wallet} from "../model/Wallet";
 import {AppState} from "../model/AppState";
 import {Storage, StorageProtectionStatus} from "../model/Storage";
+import {exportTextFile} from "../utils/FileExport";
 
 class IndexView extends DestructableView{
 	@VueVar(false) hasLocalWallet !: boolean;
@@ -120,11 +121,11 @@ class IndexView extends DestructableView{
 					return;
 				}
 
-				WalletRepository.getEncryptedWalletBackup(wallet.id).then((encryptedWallet: string|null) => {
-					if (encryptedWallet === null)
-						return;
-					let blob = new Blob([encryptedWallet], {type: "application/json"});
-					saveAs(blob, this.walletBackupFileName(wallet));
+				// Re-encrypt as v3 (no device key) so the backup is portable across
+				// devices. The stored blob is device-bound v4 when on Capacitor —
+				// dumping it directly would produce an unrestorable backup.
+				WalletRepository.getEncryptedForExport(openedWallet, password).then((encrypted) => {
+					exportTextFile(JSON.stringify(encrypted), this.walletBackupFileName(wallet));
 				});
 			});
 		});

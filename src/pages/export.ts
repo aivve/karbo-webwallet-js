@@ -20,6 +20,7 @@ import {DestructableView} from "../lib/numbersLab/DestructableView";
 import {Constants} from "../model/Constants";
 import {WalletRepository} from "../model/WalletRepository";
 import {Mnemonic} from "../model/Mnemonic";
+import {exportTextFile} from "../utils/FileExport";
 
 let wallet: Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
 let blockchainExplorer = DependencyInjectorInstance().getInstance(Constants.BLOCKCHAIN_EXPLORER);
@@ -127,9 +128,8 @@ class ExportView extends DestructableView {
 	fileExport() {
 		this.askUserPassword().then(function (params: { wallet: Wallet, password: string } | null) {
 			if (params !== null && params.wallet !== null) {
-				WalletRepository.getEncrypted(params.wallet, params.password).then(function (encrypted) {
-					let blob = new Blob([JSON.stringify(encrypted)], {type: "application/json"});
-					saveAs(blob, "wallet.json");
+				WalletRepository.getEncryptedForExport(params.wallet, params.password).then(function (encrypted) {
+					exportTextFile(JSON.stringify(encrypted), 'wallet.json');
 				});
 			}
 		});
