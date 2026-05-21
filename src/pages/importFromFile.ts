@@ -86,19 +86,20 @@ class ImportView extends DestructableView{
 		let self = this;
 		blockchainExplorer.getHeight().then(function(currentHeight){
 			setTimeout(function(){
-				let newWallet = WalletRepository.decodeWithPassword(self.rawFile,self.password);
-				if(newWallet !== null) {
-					newWallet.recalculateIfNotViewOnly();
-					AppState.openWallet(newWallet, self.password);
-					window.location.href = '#account';
-				}else{
-					swal({
-						type: 'error',
-						title: i18n.t('global.invalidPasswordModal.title'),
-						text: i18n.t('global.invalidPasswordModal.content'),
-						confirmButtonText: i18n.t('global.invalidPasswordModal.confirmText'),
-					});
-				}
+				WalletRepository.decodeWithPassword(self.rawFile, self.password).then(function (newWallet) {
+					if(newWallet !== null) {
+						newWallet.recalculateIfNotViewOnly();
+						AppState.openWallet(newWallet, self.password);
+						window.location.href = '#account';
+					}else{
+						swal({
+							type: 'error',
+							title: i18n.t('global.invalidPasswordModal.title'),
+							text: i18n.t('global.invalidPasswordModal.content'),
+							confirmButtonText: i18n.t('global.invalidPasswordModal.confirmText'),
+						});
+					}
+				});
 			},1);
 
 		});

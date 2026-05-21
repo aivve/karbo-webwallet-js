@@ -17,6 +17,23 @@ import {RawFullyEncryptedWallet, RawWallet, Wallet} from "./Wallet";
 import {CoinUri} from "./CoinUri";
 import {Storage} from "./Storage";
 
+// Vault format v3: password is run through PBKDF2-HMAC-SHA512 before being
+// used as the nacl.secretbox key. v1 (RawWallet) and v2 (RawFullyEncryptedWallet,
+// no KDF, password padded to 32 bytes) are still decryptable for migration.
+// Re-saving a v1/v2 wallet always emits v3.
+export type RawKdfEncryptedWallet = {
+	version: 3,
+	kdf: 'pbkdf2',
+	kdfHash: 'SHA-512',
+	kdfIterations: number,
+	salt: string,
+	data: number[],
+	nonce: string
+}
+
+const PBKDF2_DEFAULT_ITERATIONS = 600000;
+const PBKDF2_SALT_BYTES = 16;
+
 export type WalletVaultRecord = {
 	id:string,
 	name:string,
@@ -261,7 +278,39 @@ export class WalletRepository{
 		return Promise.resolve(null);
 	}
 	
-	static decodeWithPassword(rawWallet : RawWallet|RawFullyEncryptedWallet, password : string) : Wallet|null{
+	private static isKdfWallet(rawWallet : any) : boolean {
+		return rawWallet !== null
+			&& typeof rawWallet === 'object'
+			&& rawWallet.version === 3
+			&& rawWallet.kdf === 'pbkdf2'
+			&& typeof rawWallet.salt === 'string'
+			&& typeof rawWallet.kdfIterations === 'number';
+	}
+
+	private static derivePbkdf2Key(password : string, saltBytes : Uint8Array, iterations : number) : Promise<Uint8Array> {
+		let subtle : any = typeof crypto !== 'undefined' && (<any>crypto).subtle ? (<any>crypto).subtle : null;
+		if (subtle === null)
+			return Promise.reject('webcrypto_unavailable');
+
+		let passwordBytes = new (<any>TextEncoder)("utf8").encode(password);
+		return subtle.importKey(
+			'raw',
+			passwordBytes,
+			{ name: 'PBKDF2' },
+			false,
+			['deriveBits']
+		).then(function (keyMaterial : any) {
+			return subtle.deriveBits(
+				{ name: 'PBKDF2', salt: saltBytes, iterations: iterations, hash: 'SHA-512' },
+				keyMaterial,
+				256
+			);
+		}).then(function (derived : ArrayBuffer) {
+			return new Uint8Array(derived);
+		});
+	}
+
+	private static decodeLegacyWithPassword(rawWallet : RawWallet|RawFullyEncryptedWallet, password : string) : Wallet|null{
 		if(password.length > 32)
 			password = password.substr(0 , 32);
 		if(password.length < 32){
@@ -273,14 +322,11 @@ export class WalletRepository{
 		   privKey = privKey.slice(-32);
 		}
 
-		//console.log('open wallet with nonce', rawWallet.nonce);
 		let nonce = new (<any>TextEncoder)("utf8").encode(rawWallet.nonce);
 
 		let decodedRawWallet = null;
 
-		//detect if old type or new type of wallet
 		if(typeof (<any>rawWallet).data !== 'undefined'){//RawFullyEncryptedWallet
-			//console.log('new wallet format');
 			let rawFullyEncrypted : RawFullyEncryptedWallet = <any>rawWallet;
 			let encrypted = new Uint8Array(<any>rawFullyEncrypted.data);
 			let decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
@@ -293,7 +339,6 @@ export class WalletRepository{
 				decodedRawWallet = null;
 			}
 		}else{//RawWallet
-			//console.log('old wallet format');
 			let oldRawWallet : RawWallet = <any>rawWallet;
 			let encrypted = new Uint8Array(<any>oldRawWallet.encryptedKeys);
 			let decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
@@ -313,6 +358,32 @@ export class WalletRepository{
 		return null;
 	}
 
+	static decodeWithPassword(rawWallet : RawWallet|RawFullyEncryptedWallet|RawKdfEncryptedWallet, password : string) : Promise<Wallet|null>{
+		if (WalletRepository.isKdfWallet(rawWallet)) {
+			let kdfWallet : RawKdfEncryptedWallet = <any>rawWallet;
+			let saltBytes = nacl.util.decodeBase64(kdfWallet.salt);
+			return WalletRepository.derivePbkdf2Key(password, saltBytes, kdfWallet.kdfIterations).then(function (privKey : Uint8Array) {
+				let nonce = new (<any>TextEncoder)("utf8").encode(kdfWallet.nonce);
+				let encrypted = new Uint8Array(kdfWallet.data);
+				let decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
+				if (decrypted === null)
+					return null;
+				let decodedRawWallet : any = null;
+				try {
+					decodedRawWallet = JSON.parse(new TextDecoder("utf8").decode(decrypted));
+				} catch (e) {
+					return null;
+				}
+				let wallet = Wallet.loadFromRaw(decodedRawWallet);
+				if (wallet.coinAddressPrefix !== config.addressPrefix)
+					return null;
+				return wallet;
+			});
+		}
+
+		return Promise.resolve(WalletRepository.decodeLegacyWithPassword(<any>rawWallet, password));
+	}
+
 	static getLocalWalletWithPassword(password : string, walletId? : string|null, markOpened: boolean = true) : Promise<Wallet|null>{
 		return WalletRepository.ensureVault().then((vault: WalletVault) => {
 			let resolvedWalletId = WalletRepository.resolveWalletId(vault, walletId);
@@ -327,8 +398,9 @@ export class WalletRepository{
 				if (encryptedWalletData === null)
 					return null;
 
-				let wallet = this.decodeWithPassword(JSON.parse(encryptedWalletData), password);
-				if (wallet !== null) {
+				return this.decodeWithPassword(JSON.parse(encryptedWalletData), password).then((wallet: Wallet|null) => {
+					if (wallet === null)
+						return null;
 					if (!markOpened)
 						return wallet;
 					let now = new Date().toISOString();
@@ -340,8 +412,7 @@ export class WalletRepository{
 					return WalletRepository.writeVault(vault).then(function () {
 						return wallet;
 					});
-				}
-				return null;
+				});
 			});
 		});
 	}
@@ -354,69 +425,70 @@ export class WalletRepository{
 
 			let existingRecord = WalletRepository.findRecord(vault, resolvedWalletId);
 			let now = new Date().toISOString();
-			let encryptedWalletData = JSON.stringify(this.getEncrypted(wallet, password));
 			let address = wallet.getPublicAddress();
 
-			if (existingRecord === null) {
-				existingRecord = {
-					id: resolvedWalletId,
-					name: walletName !== null && typeof walletName === 'string' && walletName.trim() !== '' ? walletName.trim() : WalletRepository.getNextWalletName(vault),
-					address: address,
-					encryptedWalletData: encryptedWalletData,
-					createdAt: now,
-					updatedAt: now,
-					lastOpenedAt: now,
-					backupConfirmed: backupConfirmed
-				};
-				vault.wallets.push(existingRecord);
-			} else {
-				existingRecord.address = address;
-				existingRecord.encryptedWalletData = encryptedWalletData;
-				existingRecord.updatedAt = now;
-				existingRecord.backupConfirmed = existingRecord.backupConfirmed || backupConfirmed;
-				if (typeof walletName === 'string' && walletName.trim() !== '')
-					existingRecord.name = walletName.trim();
-			}
+			return this.getEncrypted(wallet, password).then((encryptedWallet: RawKdfEncryptedWallet) => {
+				let encryptedWalletData = JSON.stringify(encryptedWallet);
 
-			if (makeActive && (WalletRepository.currentWalletId === null || WalletRepository.currentWalletId === resolvedWalletId)) {
-				vault.activeWalletId = resolvedWalletId;
-				WalletRepository.currentWalletId = resolvedWalletId;
-			}
-			return WalletRepository.writeVault(vault);
+				if (existingRecord === null) {
+					existingRecord = {
+						id: resolvedWalletId!,
+						name: walletName !== null && typeof walletName === 'string' && walletName.trim() !== '' ? walletName.trim() : WalletRepository.getNextWalletName(vault),
+						address: address,
+						encryptedWalletData: encryptedWalletData,
+						createdAt: now,
+						updatedAt: now,
+						lastOpenedAt: now,
+						backupConfirmed: backupConfirmed
+					};
+					vault.wallets.push(existingRecord);
+				} else {
+					existingRecord.address = address;
+					existingRecord.encryptedWalletData = encryptedWalletData;
+					existingRecord.updatedAt = now;
+					existingRecord.backupConfirmed = existingRecord.backupConfirmed || backupConfirmed;
+					if (typeof walletName === 'string' && walletName.trim() !== '')
+						existingRecord.name = walletName.trim();
+				}
+
+				if (makeActive && (WalletRepository.currentWalletId === null || WalletRepository.currentWalletId === resolvedWalletId)) {
+					vault.activeWalletId = resolvedWalletId;
+					WalletRepository.currentWalletId = resolvedWalletId;
+				}
+				return WalletRepository.writeVault(vault);
+			});
 		});
 	}
 
-	static getEncrypted(wallet : Wallet, password : string) : RawFullyEncryptedWallet{
-		if(password.length > 32)
-			password = password.substr(0 , 32);
-		if(password.length < 32){
-			password = ('00000000000000000000000000000000'+password).slice(-32);
-		}
+	static getEncrypted(wallet : Wallet, password : string) : Promise<RawKdfEncryptedWallet>{
+		let saltBytes = nacl.randomBytes(PBKDF2_SALT_BYTES);
+		let rawSalt = nacl.util.encodeBase64(saltBytes);
+		let iterations = PBKDF2_DEFAULT_ITERATIONS;
 
-		let privKey = new (<any>TextEncoder)("utf8").encode(password);
-		// Fix cyrillic (non-latin) passwords
-		if(privKey.length > 32){
-		   privKey = privKey.slice(-32);
-		}
+		return WalletRepository.derivePbkdf2Key(password, saltBytes, iterations).then(function (privKey : Uint8Array) {
+			let rawNonce = nacl.util.encodeBase64(nacl.randomBytes(16));
+			let nonce = new (<any>TextEncoder)("utf8").encode(rawNonce);
 
-		let rawNonce = nacl.util.encodeBase64(nacl.randomBytes(16));
-		let nonce = new (<any>TextEncoder)("utf8").encode(rawNonce);
+			let rawWallet = wallet.exportToRaw();
+			let uint8EncryptedContent = new (<any>TextEncoder)("utf8").encode(JSON.stringify(rawWallet));
 
-		let rawWallet = wallet.exportToRaw();
-		let uint8EncryptedContent = new (<any>TextEncoder)("utf8").encode(JSON.stringify(rawWallet));
+			let encrypted : Uint8Array = nacl.secretbox(uint8EncryptedContent, nonce, privKey);
+			let tabEncrypted : number[] = [];
+			for(let i = 0; i < encrypted.length; ++i){
+				tabEncrypted.push(encrypted[i]);
+			}
 
-		let encrypted : Uint8Array = nacl.secretbox(uint8EncryptedContent, nonce, privKey);
-		let tabEncrypted = [];
-		for(let i = 0; i < encrypted.length; ++i){
-			tabEncrypted.push(encrypted[i]);
-		}
-
-		let fullEncryptedWallet : RawFullyEncryptedWallet = {
-			data:tabEncrypted,
-			nonce:rawNonce
-		};
-
-		return fullEncryptedWallet;
+			let result : RawKdfEncryptedWallet = {
+				version: 3,
+				kdf: 'pbkdf2',
+				kdfHash: 'SHA-512',
+				kdfIterations: iterations,
+				salt: rawSalt,
+				data: tabEncrypted,
+				nonce: rawNonce
+			};
+			return result;
+		});
 	}
 
 	static renameWallet(walletId: string, name: string): Promise<void> {

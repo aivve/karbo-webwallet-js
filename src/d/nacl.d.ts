@@ -10,6 +10,7 @@ declare var nacl : {
     //open:(encrypted:Uint8Array, nonce:Uint8Array, privKey:Uint8Array)=>Uint8Array;
     util:{
         encodeBase64:(value : Uint8Array)=>string,
+        decodeBase64:(value : string)=>Uint8Array,
     },
     randomBytes:(bits : number) => Uint8Array
 };
