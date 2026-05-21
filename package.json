@@ -18,6 +18,7 @@
     "main": "desktop/main.js",
     "dependencies": {
         "@capacitor/android": "^8.3.0",
+        "@capacitor/app": "^8.0.0",
         "@capacitor/cli": "^8.3.0",
         "@capacitor/core": "^8.3.0",
         "typescript": "^5.0.4",

@@ -79,11 +79,13 @@ class SendView extends DestructableView {
 		let destinationName = Url.getHashSearchParameter('destName');
 		let description = Url.getHashSearchParameter('txDesc');
 		let redirect = Url.getHashSearchParameter('redirect');
-		if (sendAddress !== null) this.destinationAddressUser = sendAddress.substr(0, 256);
-		if (amount !== null) this.amountToSend = amount;
-		if (destinationName !== null) this.txDestinationName = destinationName.substr(0, 256);
-		if (description !== null) this.txDescription = description.substr(0, 256);
+		let paymentId = Url.getHashSearchParameter('paymentId');
+		if (sendAddress !== null) this.destinationAddressUser = decodeURIComponent(sendAddress).substr(0, 256);
+		if (amount !== null) this.amountToSend = decodeURIComponent(amount);
+		if (destinationName !== null) this.txDestinationName = decodeURIComponent(destinationName).substr(0, 256);
+		if (description !== null) this.txDescription = decodeURIComponent(description).substr(0, 256);
 		if (redirect !== null) this.redirectUrlAfterSend = decodeURIComponent(redirect);
+		if (paymentId !== null) this.paymentId = decodeURIComponent(paymentId).substr(0, 128);
 		this.ringSize = (config.defaultMixin + 1).toString();
 		this.fee = Cn.formatMoney((<any>window).config.coinFee);
 

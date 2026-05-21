@@ -23,6 +23,7 @@ import {Storage} from "./model/Storage";
 import {Translations} from "./model/Translations";
 import {Transaction} from "./model/Transaction";
 import {WalletWatchdog} from "./model/WalletWatchdog";
+import {CoinUri} from "./model/CoinUri";
 
 //========================================================
 //bridge for cnUtil with the new mnemonic class
@@ -261,7 +262,73 @@ promiseLoadingReady.then(function(){
 		updateActiveNav();
 	};
 	updateActiveNav();
+
+	if (isCapacitorApp) {
+		registerKarboDeepLinkHandler();
+	}
 });
+
+function buildSendHashFromKarboUri(url : string) : string|null {
+	// Wallet-restore URIs share the karbowanec: prefix but should never auto-route
+	// into the send flow — the user could end up sending to the address they
+	// intended to import. Refuse to handle those here.
+	if (/[?&](spend_key|view_key|mnemonic_seed)=/.test(url))
+		return null;
+
+	let parsed : any = null;
+	try {
+		parsed = CoinUri.decodeTx(url);
+	} catch (e) {
+		parsed = null;
+	}
+	if (parsed === null || !parsed.address)
+		return null;
+
+	let params : string[] = ['address=' + encodeURIComponent(parsed.address)];
+	if (typeof parsed.amount === 'string' && parsed.amount !== '')
+		params.push('amount=' + encodeURIComponent(parsed.amount));
+	if (typeof parsed.paymentId === 'string' && parsed.paymentId !== '')
+		params.push('paymentId=' + encodeURIComponent(parsed.paymentId));
+	if (typeof parsed.recipientName === 'string' && parsed.recipientName !== '')
+		params.push('destName=' + encodeURIComponent(parsed.recipientName));
+	if (typeof parsed.description === 'string' && parsed.description !== '')
+		params.push('txDesc=' + encodeURIComponent(parsed.description));
+
+	return '#!send?' + params.join('&');
+}
+
+function navigateToKarboUri(url : string) {
+	let hash = buildSendHashFromKarboUri(url);
+	if (hash === null)
+		return;
+	if (window.location.hash === hash) {
+		window.location.hash = '#!index';
+		setTimeout(function(){ window.location.hash = hash; }, 0);
+	} else {
+		window.location.hash = hash;
+	}
+}
+
+function registerKarboDeepLinkHandler() {
+	let capacitor : any = (window as any).Capacitor;
+	if (!capacitor || !capacitor.Plugins || !capacitor.Plugins.App)
+		return;
+	let appPlugin : any = capacitor.Plugins.App;
+
+	if (typeof appPlugin.getLaunchUrl === 'function') {
+		appPlugin.getLaunchUrl().then(function (result : any) {
+			if (result && typeof result.url === 'string')
+				navigateToKarboUri(result.url);
+		}).catch(function () {});
+	}
+
+	if (typeof appPlugin.addListener === 'function') {
+		appPlugin.addListener('appUrlOpen', function (event : any) {
+			if (event && typeof event.url === 'string')
+				navigateToKarboUri(event.url);
+		});
+	}
+}
 
 //========================================================
 //==================Service worker for web================
