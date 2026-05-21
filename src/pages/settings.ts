@@ -27,6 +27,7 @@ import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvide
 import {BlockchainExplorer} from "../model/blockchain/BlockchainExplorer";
 import {WalletWatchdog} from "../model/WalletWatchdog";
 import {DeleteWallet} from "../model/DeleteWallet";
+import {Biometric} from "../model/Biometric";
 
 let wallet : Wallet = DependencyInjectorInstance().getInstance(Wallet.name, 'default', false);
 let blockchainExplorer: BlockchainExplorer = BlockchainExplorerProvider.getInstance();
@@ -49,6 +50,8 @@ class SettingsView extends DestructableView{
 	@VueVar(0) nativeVersionCode !: number;
 	@VueVar('') nativeVersionNumber !: string;
 	@VueVar('walletVault.storageStatus.notAvailable') storageProtectionKey !: string;
+	@VueVar(false) biometricSupported !: boolean;
+	@VueVar(false) biometricEnabled !: boolean;
 
 	private initializing : boolean = true;
 
@@ -77,6 +80,7 @@ class SettingsView extends DestructableView{
 			this.theme = userTheme;
 		});
 		this.refreshStorageProtection();
+		this.refreshBiometric();
 
 		if(typeof (<any>window).cordova !== 'undefined' && typeof (<any>window).cordova.getAppVersion !== 'undefined') {
 			(<any>window).cordova.getAppVersion.getVersionNumber().then((version : string) => {
@@ -96,6 +100,71 @@ class SettingsView extends DestructableView{
 				this.storageProtectionKey = 'walletVault.storageStatus.notAvailable';
 			else
 				this.storageProtectionKey = 'walletVault.storageStatus.notGranted';
+		});
+	}
+
+	refreshBiometric(){
+		Biometric.isSupported().then((supported: boolean) => {
+			this.biometricSupported = supported;
+			if (!supported) {
+				this.biometricEnabled = false;
+				return;
+			}
+			let walletId = WalletRepository.getCurrentWalletId();
+			if (walletId === null) {
+				this.biometricEnabled = false;
+				return;
+			}
+			Biometric.isEnabledForWallet(walletId).then((enabled: boolean) => {
+				this.biometricEnabled = enabled;
+			});
+		});
+	}
+
+	toggleBiometric(){
+		let walletId = WalletRepository.getCurrentWalletId();
+		if (walletId === null)
+			return;
+
+		if (this.biometricEnabled) {
+			Biometric.disableForWallet(walletId).then(() => {
+				this.biometricEnabled = false;
+			});
+			return;
+		}
+
+		swal({
+			title: i18n.t('settingsPage.biometric.enableModal.title'),
+			input: 'password',
+			showCancelButton: true,
+			confirmButtonText: i18n.t('settingsPage.biometric.enableModal.confirmText'),
+			cancelButtonText: i18n.t('global.openWalletModal.cancelText'),
+			text: i18n.t('settingsPage.biometric.enableModal.content')
+		}).then((result: any) => {
+			if (!result.value)
+				return;
+			let password = result.value;
+			WalletRepository.getLocalWalletWithPassword(password, walletId, false).then((openedWallet: Wallet|null) => {
+				if (openedWallet === null) {
+					swal({
+						type: 'error',
+						title: i18n.t('global.invalidPasswordModal.title'),
+						text: i18n.t('global.invalidPasswordModal.content'),
+						confirmButtonText: i18n.t('global.invalidPasswordModal.confirmText')
+					});
+					return;
+				}
+				Biometric.enableForWallet(walletId!, password, i18n.t('settingsPage.biometric.promptReason')).then((ok: boolean) => {
+					this.biometricEnabled = ok;
+					if (!ok)
+						swal({
+							type: 'error',
+							title: i18n.t('settingsPage.biometric.failModal.title'),
+							text: i18n.t('settingsPage.biometric.failModal.content'),
+							confirmButtonText: i18n.t('global.invalidPasswordModal.confirmText')
+						});
+				});
+			});
 		});
 	}
 

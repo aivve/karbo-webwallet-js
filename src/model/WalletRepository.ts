@@ -16,6 +16,7 @@
 import {RawFullyEncryptedWallet, RawWallet, Wallet} from "./Wallet";
 import {CoinUri} from "./CoinUri";
 import {Storage} from "./Storage";
+import {Biometric} from "./Biometric";
 
 // Vault format history:
 //   v1 (RawWallet)              — password padded to 32 bytes, no KDF
@@ -636,9 +637,11 @@ export class WalletRepository{
 			if (WalletRepository.currentWalletId === resolvedWalletId)
 				WalletRepository.currentWalletId = null;
 
+			let cleanup = Biometric.disableForWallet(resolvedWalletId);
+
 			if (WalletRepository.hasElectronStorage() && window.karboStorage)
-				return window.karboStorage.deleteWallet(resolvedWalletId);
-			return WalletRepository.writeVault(vault);
+				return cleanup.then(function () { return window.karboStorage!.deleteWallet(resolvedWalletId!); });
+			return cleanup.then(function () { return WalletRepository.writeVault(vault); });
 		});
 	}
 

@@ -54,6 +54,18 @@
 		</div>
 	</div>
 
+	<!-- Biometric Unlock -->
+	<div class="card" v-if="biometricSupported">
+		<div class="card-title">{{ $t("settingsPage.biometric.title") }}</div>
+		<div class="field checkbox toggle">
+			<input type="checkbox" :checked="biometricEnabled" @click.prevent="toggleBiometric()">
+			<label>{{ $t("settingsPage.biometric.label") }}</label>
+		</div>
+		<div style="color:var(--color-text-muted);font-size:0.8125rem;line-height:1.6;">
+			{{ $t("settingsPage.biometric.description") }}
+		</div>
+	</div>
+
 	<!-- Node Settings -->
 	<div class="card">
 		<div class="card-title">{{ $t("settingsPage.settingsBlock.customNode.label") }}</div>

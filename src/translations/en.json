@@ -46,7 +46,8 @@
 		"title":"Wallet Password",
 		"confirmText":"Open",
 		"cancelText":"Cancel",
-		"forgotPassword": "Forgot password?"
+		"forgotPassword": "Forgot password?",
+		"biometricReason": "Unlock your wallet"
 	  },
 	  "invalidPasswordModal":{
 		"title":"Oops...",
@@ -447,6 +448,21 @@
 	  "localWalletStorage":{
 	    "title": "Local Wallet Storage",
 	    "protectionNote": "Storage protection only reduces the risk of automatic browser eviction. It does not prevent manual clearing of site data."
+	  },
+	  "biometric":{
+		"title": "Biometric Unlock",
+		"label": "Unlock with fingerprint or face",
+		"description": "Stores your wallet password in hardware-backed secure storage and requires a biometric prompt to unlock. Only available on devices with enrolled biometrics.",
+		"promptReason": "Confirm biometric to enable unlock",
+		"enableModal":{
+		  "title": "Enable Biometric Unlock",
+		  "content": "Enter your wallet password to confirm.",
+		  "confirmText": "Enable"
+		},
+		"failModal":{
+		  "title": "Biometric Setup Failed",
+		  "content": "We couldn't store the credential. Make sure biometrics are enrolled on this device."
+		}
 	  },
 	  "walletSettings":{
 		"creationHeight":{
