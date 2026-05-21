@@ -30,7 +30,7 @@
 			<a href="#!import" class="btn basic">{{ $t("walletVault.actions.import") }}</a>
 		</div>
 
-		<div class="wallet-storage-cards">
+		<div class="wallet-storage-cards hideOnNative">
 			<div class="card wallet-storage-note">
 				<div class="card-title">{{ $t("walletVault.storageNotice.title") }}</div>
 				<div v-html="$t('walletVault.storageNotice.content')"></div>
@@ -41,6 +41,13 @@
 				<div class="storage-status-copy">
 					{{ $t("walletVault.storageStatus.description") }}
 				</div>
+			</div>
+		</div>
+
+		<div class="wallet-storage-cards hideOnNonNative">
+			<div class="card wallet-storage-note">
+				<div class="card-title">{{ $t("walletVault.nativeStorageNotice.title") }}</div>
+				<div v-html="$t('walletVault.nativeStorageNotice.content')"></div>
 			</div>
 		</div>
 	</div>

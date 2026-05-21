@@ -134,6 +134,10 @@
 			"title": "Local storage notice",
 			"content": "This wallet is stored locally in this browser.<br/><br/>You have confirmed that your wallet keys are backed up. If you clear site data, reset the browser, use private mode, or uninstall the app, the local wallet may disappear, but you can restore it from your backup keys or wallet backup file."
 		},
+		"nativeStorageNotice": {
+			"title": "Stored on this device",
+			"content": "Your wallet is kept in this app's private storage and is hardware-encrypted via Android Keystore.<br/><br/>It survives app updates and the system 'Clear cache' button. It is only removed if you choose 'Clear data' in App Info or uninstall the app.<br/><br/><strong>Always back up your mnemonic seed</strong> — a lost or wiped device with no backup means lost funds."
+		},
 		"renameModal": {
 			"title": "Rename Wallet",
 			"confirmText": "Rename"
