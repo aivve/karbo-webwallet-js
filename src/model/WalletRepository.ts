@@ -17,22 +17,30 @@ import {RawFullyEncryptedWallet, RawWallet, Wallet} from "./Wallet";
 import {CoinUri} from "./CoinUri";
 import {Storage} from "./Storage";
 
-// Vault format v3: password is run through PBKDF2-HMAC-SHA512 before being
-// used as the nacl.secretbox key. v1 (RawWallet) and v2 (RawFullyEncryptedWallet,
-// no KDF, password padded to 32 bytes) are still decryptable for migration.
-// Re-saving a v1/v2 wallet always emits v3.
+// Vault format history:
+//   v1 (RawWallet)              — password padded to 32 bytes, no KDF
+//   v2 (RawFullyEncryptedWallet) — same key derivation, simpler payload shape
+//   v3 (RawKdfEncryptedWallet)  — PBKDF2-HMAC-SHA512(password, salt). Portable.
+//   v4 (same shape, usesDeviceKey=true) — PBKDF2 key XOR'd with a hardware-backed
+//        device key held in Android Keystore via @aparajita/capacitor-secure-storage.
+//        Vault becomes device-bound: a stolen file is useless without the device.
+// Local saves on Capacitor emit v4 when the device key is available, v3 otherwise.
+// Exported backups always emit v3 so they remain restorable on a different device.
+// v1/v2 still openable; auto-upgrades on next save.
 export type RawKdfEncryptedWallet = {
-	version: 3,
+	version: 3 | 4,
 	kdf: 'pbkdf2',
 	kdfHash: 'SHA-512',
 	kdfIterations: number,
 	salt: string,
 	data: number[],
-	nonce: string
+	nonce: string,
+	usesDeviceKey?: boolean
 }
 
 const PBKDF2_DEFAULT_ITERATIONS = 600000;
 const PBKDF2_SALT_BYTES = 16;
+const DEVICE_KEY_STORAGE_KEY = 'karbo.deviceKey.v1';
 
 export type WalletVaultRecord = {
 	id:string,
@@ -281,10 +289,62 @@ export class WalletRepository{
 	private static isKdfWallet(rawWallet : any) : boolean {
 		return rawWallet !== null
 			&& typeof rawWallet === 'object'
-			&& rawWallet.version === 3
+			&& (rawWallet.version === 3 || rawWallet.version === 4)
 			&& rawWallet.kdf === 'pbkdf2'
 			&& typeof rawWallet.salt === 'string'
 			&& typeof rawWallet.kdfIterations === 'number';
+	}
+
+	// Returns the SecureStorage plugin handle if present, or null on web/desktop.
+	// We deliberately don't import the plugin — the AMD/ES5 build has no bundler.
+	// The plugin auto-registers on window.Capacitor.Plugins.SecureStorage when
+	// installed and `npx cap sync android` has run.
+	private static getSecureStorage() : any {
+		let capacitor : any = (window as any).Capacitor;
+		if (!capacitor || !capacitor.Plugins || !capacitor.Plugins.SecureStorage)
+			return null;
+		return capacitor.Plugins.SecureStorage;
+	}
+
+	// Returns the per-install device key, or null on platforms without secure storage.
+	// Never throws — caller falls back to v3 (PBKDF2 only) if this returns null.
+	private static getDeviceKey() : Promise<Uint8Array|null> {
+		let secureStorage = WalletRepository.getSecureStorage();
+		if (secureStorage === null)
+			return Promise.resolve(null);
+
+		return Promise.resolve(secureStorage.get({ key: DEVICE_KEY_STORAGE_KEY })).then(function (result : any) {
+			if (result && typeof result.value === 'string' && result.value !== '')
+				return nacl.util.decodeBase64(result.value);
+			return null;
+		}).catch(function () {
+			return null;
+		});
+	}
+
+	private static getOrCreateDeviceKey() : Promise<Uint8Array|null> {
+		let secureStorage = WalletRepository.getSecureStorage();
+		if (secureStorage === null)
+			return Promise.resolve(null);
+
+		return WalletRepository.getDeviceKey().then(function (existing : Uint8Array|null) {
+			if (existing !== null)
+				return existing;
+			let fresh = nacl.randomBytes(32);
+			let encoded = nacl.util.encodeBase64(fresh);
+			return Promise.resolve(secureStorage.set({ key: DEVICE_KEY_STORAGE_KEY, value: encoded })).then(function () {
+				return fresh;
+			}).catch(function () {
+				return null;
+			});
+		});
+	}
+
+	private static xorBytes(a : Uint8Array, b : Uint8Array) : Uint8Array {
+		let out = new Uint8Array(a.length);
+		for (let i = 0; i < a.length; ++i)
+			out[i] = a[i] ^ b[i];
+		return out;
 	}
 
 	private static derivePbkdf2Key(password : string, saltBytes : Uint8Array, iterations : number) : Promise<Uint8Array> {
@@ -359,29 +419,46 @@ export class WalletRepository{
 	}
 
 	static decodeWithPassword(rawWallet : RawWallet|RawFullyEncryptedWallet|RawKdfEncryptedWallet, password : string) : Promise<Wallet|null>{
-		if (WalletRepository.isKdfWallet(rawWallet)) {
-			let kdfWallet : RawKdfEncryptedWallet = <any>rawWallet;
-			let saltBytes = nacl.util.decodeBase64(kdfWallet.salt);
-			return WalletRepository.derivePbkdf2Key(password, saltBytes, kdfWallet.kdfIterations).then(function (privKey : Uint8Array) {
-				let nonce = new (<any>TextEncoder)("utf8").encode(kdfWallet.nonce);
-				let encrypted = new Uint8Array(kdfWallet.data);
-				let decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
-				if (decrypted === null)
-					return null;
-				let decodedRawWallet : any = null;
-				try {
-					decodedRawWallet = JSON.parse(new TextDecoder("utf8").decode(decrypted));
-				} catch (e) {
-					return null;
-				}
-				let wallet = Wallet.loadFromRaw(decodedRawWallet);
-				if (wallet.coinAddressPrefix !== config.addressPrefix)
-					return null;
-				return wallet;
-			});
-		}
+		if (!WalletRepository.isKdfWallet(rawWallet))
+			return Promise.resolve(WalletRepository.decodeLegacyWithPassword(<any>rawWallet, password));
 
-		return Promise.resolve(WalletRepository.decodeLegacyWithPassword(<any>rawWallet, password));
+		let kdfWallet : RawKdfEncryptedWallet = <any>rawWallet;
+		let saltBytes = nacl.util.decodeBase64(kdfWallet.salt);
+		let needsDeviceKey = kdfWallet.version === 4 && kdfWallet.usesDeviceKey === true;
+
+		let deviceKeyPromise : Promise<Uint8Array|null> = needsDeviceKey
+			? WalletRepository.getDeviceKey()
+			: Promise.resolve(null);
+
+		return Promise.all([
+			WalletRepository.derivePbkdf2Key(password, saltBytes, kdfWallet.kdfIterations),
+			deviceKeyPromise
+		]).then(function (parts : [Uint8Array, Uint8Array|null]) {
+			let pbkdfKey = parts[0];
+			let deviceKey = parts[1];
+
+			if (needsDeviceKey && deviceKey === null)
+				return null; // v4 vault but device key gone (reinstall, secure-storage cleared) — unrecoverable from local file alone; user must restore from mnemonic
+			let privKey = needsDeviceKey && deviceKey !== null
+				? WalletRepository.xorBytes(pbkdfKey, deviceKey)
+				: pbkdfKey;
+
+			let nonce = new (<any>TextEncoder)("utf8").encode(kdfWallet.nonce);
+			let encrypted = new Uint8Array(kdfWallet.data);
+			let decrypted = nacl.secretbox.open(encrypted, nonce, privKey);
+			if (decrypted === null)
+				return null;
+			let decodedRawWallet : any = null;
+			try {
+				decodedRawWallet = JSON.parse(new TextDecoder("utf8").decode(decrypted));
+			} catch (e) {
+				return null;
+			}
+			let wallet = Wallet.loadFromRaw(decodedRawWallet);
+			if (wallet.coinAddressPrefix !== config.addressPrefix)
+				return null;
+			return wallet;
+		});
 	}
 
 	static getLocalWalletWithPassword(password : string, walletId? : string|null, markOpened: boolean = true) : Promise<Wallet|null>{
@@ -427,7 +504,7 @@ export class WalletRepository{
 			let now = new Date().toISOString();
 			let address = wallet.getPublicAddress();
 
-			return this.getEncrypted(wallet, password).then((encryptedWallet: RawKdfEncryptedWallet) => {
+			return this.getEncryptedForLocalStorage(wallet, password).then((encryptedWallet: RawKdfEncryptedWallet) => {
 				let encryptedWalletData = JSON.stringify(encryptedWallet);
 
 				if (existingRecord === null) {
@@ -460,12 +537,14 @@ export class WalletRepository{
 		});
 	}
 
-	static getEncrypted(wallet : Wallet, password : string) : Promise<RawKdfEncryptedWallet>{
+	private static buildEncryptedWallet(wallet : Wallet, password : string, deviceKey : Uint8Array|null) : Promise<RawKdfEncryptedWallet> {
 		let saltBytes = nacl.randomBytes(PBKDF2_SALT_BYTES);
 		let rawSalt = nacl.util.encodeBase64(saltBytes);
 		let iterations = PBKDF2_DEFAULT_ITERATIONS;
 
-		return WalletRepository.derivePbkdf2Key(password, saltBytes, iterations).then(function (privKey : Uint8Array) {
+		return WalletRepository.derivePbkdf2Key(password, saltBytes, iterations).then(function (pbkdfKey : Uint8Array) {
+			let privKey = deviceKey !== null ? WalletRepository.xorBytes(pbkdfKey, deviceKey) : pbkdfKey;
+
 			let rawNonce = nacl.util.encodeBase64(nacl.randomBytes(16));
 			let nonce = new (<any>TextEncoder)("utf8").encode(rawNonce);
 
@@ -479,7 +558,7 @@ export class WalletRepository{
 			}
 
 			let result : RawKdfEncryptedWallet = {
-				version: 3,
+				version: deviceKey !== null ? 4 : 3,
 				kdf: 'pbkdf2',
 				kdfHash: 'SHA-512',
 				kdfIterations: iterations,
@@ -487,8 +566,29 @@ export class WalletRepository{
 				data: tabEncrypted,
 				nonce: rawNonce
 			};
+			if (deviceKey !== null)
+				result.usesDeviceKey = true;
 			return result;
 		});
+	}
+
+	// Portable backup — never uses the device key, restorable on any device.
+	static getEncryptedForExport(wallet : Wallet, password : string) : Promise<RawKdfEncryptedWallet> {
+		return WalletRepository.buildEncryptedWallet(wallet, password, null);
+	}
+
+	// Local-storage form — uses device key when available so a stolen vault file
+	// can't be brute-forced off-device. Falls back to v3 (portable) on web/desktop
+	// and when secure storage is unavailable.
+	static getEncryptedForLocalStorage(wallet : Wallet, password : string) : Promise<RawKdfEncryptedWallet> {
+		return WalletRepository.getOrCreateDeviceKey().then(function (deviceKey : Uint8Array|null) {
+			return WalletRepository.buildEncryptedWallet(wallet, password, deviceKey);
+		});
+	}
+
+	// Back-compat alias; prefer getEncryptedForExport for new code.
+	static getEncrypted(wallet : Wallet, password : string) : Promise<RawKdfEncryptedWallet> {
+		return WalletRepository.getEncryptedForExport(wallet, password);
 	}
 
 	static renameWallet(walletId: string, name: string): Promise<void> {

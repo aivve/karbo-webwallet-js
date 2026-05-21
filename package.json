@@ -17,10 +17,14 @@
     },
     "main": "desktop/main.js",
     "dependencies": {
+        "@aparajita/capacitor-biometric-auth": "^9.0.0",
+        "@aparajita/capacitor-secure-storage": "^6.0.0",
         "@capacitor/android": "^8.3.0",
         "@capacitor/app": "^8.0.0",
         "@capacitor/cli": "^8.3.0",
         "@capacitor/core": "^8.3.0",
+        "@capacitor/filesystem": "^8.0.0",
+        "@capacitor/share": "^8.0.0",
         "typescript": "^5.0.4",
         "workbox-build": "^6.5.4"
     },
