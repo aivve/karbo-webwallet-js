@@ -16,7 +16,7 @@ myGlobal.config = {
 	testnet: false,
 	coinUnitPlaces: 12,
 	coinDisplayUnitPlaces: 2,
-	txMinConfirms: 5,
+	txMinConfirms: 2,
 	txCoinbaseMinConfirms: 10,
 	ctForkHeight: 4294967294,
 	addressPrefix: 111,

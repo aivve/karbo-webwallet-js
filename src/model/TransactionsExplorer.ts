@@ -508,6 +508,16 @@ export class TransactionsExplorer {
 		// {"height"          , tx.height},
 		// {"spend_key_images", json::array()}
 
+		// Outputs scanned by an older (pre-CT) version of the scanner can be
+		// persisted without ctCommitment / ctMaskedAmount / ctRingAmount even
+		// when they're actually confidential outputs from v2 txs. If we feed
+		// those to the sender path they get classified as transparent (see
+		// `ring_amount` below) and shipped to the daemon as KeyInputs with the
+		// decoded amount but with a globalIndex that lives in the CT bucket —
+		// the daemon then rejects with "Wrong index in transaction inputs".
+		// Skip them defensively until a rescan repopulates the CT markers.
+		let staleCtSuspects: Array<{ hash: string, height: number, amount: number, globalIndex: number }> = [];
+
 		for (let tr of wallet.getAll()) {
 			//todo improve to take into account miner tx
 			//only add outs unlocked
@@ -515,7 +525,29 @@ export class TransactionsExplorer {
 				continue;
 			}
 
+			let txIsCtEra = TransactionsExplorer.isCtActivated(tr.blockHeight);
+
 			for (let out of tr.outs) {
+
+				if (
+					txIsCtEra
+					&& !tr.is_coinbase
+					&& out.ctCommitment === ''
+					&& out.ctMaskedAmount === ''
+					&& out.ctRingAmount === ''
+				) {
+					// CT-era, non-coinbase output with no CT markers — almost
+					// certainly a confidential output scanned before the wallet
+					// knew about CT fields. globalIndex points into the CT
+					// bucket, not the amount bucket implied by `amount`.
+					staleCtSuspects.push({
+						hash: tr.hash,
+						height: tr.blockHeight,
+						amount: out.amount,
+						globalIndex: out.globalIndex,
+					});
+					continue;
+				}
 
 				let rct = '';
 				if (out.rtcAmount !== '') {
@@ -538,6 +570,15 @@ export class TransactionsExplorer {
 					is_coinbase: tr.is_coinbase
 				});
 			}
+		}
+
+		if (staleCtSuspects.length > 0) {
+			console.warn(
+				'[wallet] Skipping ' + staleCtSuspects.length +
+				' CT-era output(s) without CT markers — likely scanned by an older build. ' +
+				'Reset and rescan the wallet to recover them.',
+				staleCtSuspects
+			);
 		}
 
 		//console.log('outs count before spend:', unspentOuts.length, unspentOuts);
