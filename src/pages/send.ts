@@ -53,6 +53,7 @@ class SendView extends DestructableView {
 	@VueVar(true) ringSizeIsValid !: boolean;
 	@VueVar('0.01') fee !: string;
 	@VueVar(true) feeIsValid !: boolean;
+	@VueVar(false) sending !: boolean;
 
 	@VueVar(null) domainAliasAddress !: string | null;
 	@VueVar(null) txDestinationName !: string | null;
@@ -109,6 +110,7 @@ class SendView extends DestructableView {
 		this.fee = MIN_FEE;
 		this.ringSizeIsValid = true;
 		this.feeIsValid = true;
+		this.sending = false;
 
 		this.stopScan();
 	}
@@ -242,11 +244,14 @@ class SendView extends DestructableView {
 
 	send() {
 		let self = this;
+		if (this.sending) return;
+		this.sending = true;
 		blockchainExplorer.getHeight().then(function (blockchainHeight: number) {
 			let amount = parseFloat(self.amountToSend);
 			if (self.destinationAddress !== null) {
 				//todo use BigInteger
 				if (amount * Math.pow(10, config.coinUnitPlaces) > wallet.unlockedAmount(blockchainHeight)) {
+					self.sending = false;
 					swal({
 						type: 'error',
 						title: i18n.t('sendPage.notEnoughMoneyModal.title'),
@@ -261,6 +266,7 @@ class SendView extends DestructableView {
 				let destinationAddress = self.destinationAddress;
 				let feeToSendWith = self.parseMoneyToAtomic(self.fee);
 				if (feeToSendWith === null || !self.feeIsValid) {
+					self.sending = false;
 					swal({
 						type: 'error',
 						title: i18n.t('sendPage.invalidAmountModal.title'),
@@ -331,6 +337,7 @@ class SendView extends DestructableView {
 					false,
 					feeToSendWith).then(function (rawTxData: { raw: { hash: string, prvkey: string, raw: string }, signed: any }) {
 					blockchainExplorer.sendRawTx(rawTxData.raw.raw).then(function () {
+						self.sending = false;
 						//save the tx private key
 						wallet.addTxPrivateKeyWithTxHash(rawTxData.raw.hash, rawTxData.raw.prvkey);
 
@@ -377,6 +384,7 @@ class SendView extends DestructableView {
 							}
 						});
 					}).catch(function (data: any) {
+						self.sending = false;
 						swal({
 							type: 'error',
 							title: i18n.t('sendPage.transferExceptionModal.title'),
@@ -386,6 +394,7 @@ class SendView extends DestructableView {
 					});
 					swal.close();
 				}).catch(function (error: any) {
+					self.sending = false;
 					//console.log(error);
 					if (error && error !== '') {
 						if (typeof error === 'string')
@@ -405,6 +414,7 @@ class SendView extends DestructableView {
 					}
 				});
 			} else {
+				self.sending = false;
 				swal({
 					type: 'error',
 					title: i18n.t('sendPage.invalidAmountModal.title'),
@@ -412,6 +422,8 @@ class SendView extends DestructableView {
 					confirmButtonText: i18n.t('sendPage.invalidAmountModal.confirmText'),
 				});
 			}
+		}).catch(function () {
+			self.sending = false;
 		});
 	}
 

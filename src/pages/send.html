@@ -91,7 +91,9 @@
 			</div>
 
 			<div class="tc" style="margin-top:0.5rem;">
-				<button type="button" class="btn primary" style="width:100%;" @click="send()" :disabled="!destinationAddressValid || !amountToSendValid || !ringSizeIsValid || !feeIsValid">{{ $t("sendPage.sendBlock.sendButton") }}</button>
+				<button type="button" class="btn primary" style="width:100%;" @click="send()" :disabled="sending || !destinationAddressValid || !amountToSendValid || !ringSizeIsValid || !feeIsValid">
+					<i v-if="sending" class="fa fa-spinner fa-spin" style="margin-right:0.4rem;" aria-hidden="true"></i>{{ $t("sendPage.sendBlock.sendButton") }}
+				</button>
 			</div>
 			<div class="tc" style="margin-top:0.5rem;" v-if="lockedForm">
 				<button type="button" class="btn basic" style="width:100%;" @click="reset()">{{ $t("sendPage.sendBlock.cancelButton") }}</button>
