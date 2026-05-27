@@ -78,8 +78,14 @@ export class TransactionsExplorer {
 
 	static isCtActivated(blockchainHeight: number): boolean {
 		let lastBlockMajorVersion = parseInt((<any>config).lastBlockMajorVersion || '0');
-		if (lastBlockMajorVersion >= 6) return true;
 		let forkHeight = new JSBigInt(typeof config.ctForkHeight !== 'undefined' ? config.ctForkHeight : '4294967294');
+		if (
+			lastBlockMajorVersion >= 6 &&
+			forkHeight.compare(new JSBigInt(blockchainHeight)) > 0 &&
+			typeof (<any>config).ctForkHeightTestnet !== 'undefined'
+		) {
+			forkHeight = new JSBigInt((<any>config).ctForkHeightTestnet);
+		}
 		return new JSBigInt(blockchainHeight).compare(forkHeight) >= 0;
 	}
 
@@ -130,19 +136,21 @@ export class TransactionsExplorer {
 		return aligned;
 	}
 
-	// An output is a "stale CT suspect" when it sits in a CT-era non-coinbase
-	// tx but has none of the CT markers populated. The only way that can
-	// happen today is if it was persisted by an older scanner that decoded the
-	// amount but didn't store ctCommitment/ctMaskedAmount/ctRingAmount.
+	// An output is a stale CT suspect when it sits in a CT-era non-coinbase
+	// tx but has incomplete CT markers. The common case is data persisted by
+	// an older scanner that decoded the amount but did not store all CT fields.
 	// formatWalletOutsForTx drops these from sends so we don't ship rings the
 	// daemon will reject; healStaleCtOutputs (WalletWatchdog) re-fetches the
 	// parent tx and re-parses it under the current scanner to repopulate them.
 	static isStaleCtOutput(tr: Transaction, out: TransactionOut): boolean {
 		return TransactionsExplorer.isCtActivated(tr.blockHeight)
 			&& !tr.is_coinbase
-			&& out.ctCommitment === ''
-			&& out.ctMaskedAmount === ''
-			&& out.ctRingAmount === '';
+			&& (
+				!out.ctCommitment ||
+				!out.ctMaskedAmount ||
+				!out.ctBlinding ||
+				!out.ctRingAmount
+			);
 	}
 
 	// Returns one entry per suspect tx (deduped by hash), regardless of how
@@ -592,12 +600,12 @@ export class TransactionsExplorer {
 		// {"height"          , tx.height},
 		// {"spend_key_images", json::array()}
 
-		// Outputs scanned by an older (pre-CT) version of the scanner can be
+		// Outputs scanned by an older scanner can be
 		// persisted without ctCommitment / ctMaskedAmount / ctRingAmount even
 		// when they're actually confidential outputs from v2 txs. If we feed
 		// those to the sender path they get classified as transparent (see
-		// `ring_amount` below) and shipped to the daemon as KeyInputs with the
-		// decoded amount but with a globalIndex that lives in the CT bucket —
+		// `ring_amount` below) and shipped to the daemon as inputs with the
+		// decoded amount but with a globalIndex that lives in the CT bucket -
 		// the daemon then rejects with "Wrong index in transaction inputs".
 		// Skip them defensively until a rescan repopulates the CT markers.
 		let staleCtSuspects: Array<{ hash: string, height: number, amount: number, globalIndex: number }> = [];
@@ -642,7 +650,7 @@ export class TransactionsExplorer {
 					ctCommitment: out.ctCommitment,
 					ctMaskedAmount: out.ctMaskedAmount,
 					ctBlinding: out.ctBlinding,
-					ring_amount: out.ctRingAmount || (out.ctCommitment !== '' ? CnTransactions.ctConfidentialOutputAmount() : out.amount),
+					ring_amount: out.ctRingAmount || (out.ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : out.amount),
 					is_coinbase: tr.is_coinbase
 				});
 			}
@@ -651,8 +659,8 @@ export class TransactionsExplorer {
 		if (staleCtSuspects.length > 0) {
 			console.warn(
 				'[wallet] Skipping ' + staleCtSuspects.length +
-				' CT-era output(s) without CT markers — likely scanned by an older build. ' +
-				'Reset and rescan the wallet to recover them.',
+				' CT-era output(s) with incomplete CT markers. ' +
+				'The wallet will re-fetch those txs in the background.',
 				staleCtSuspects
 			);
 		}

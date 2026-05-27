@@ -19,6 +19,7 @@ myGlobal.config = {
 	txMinConfirms: 2,
 	txCoinbaseMinConfirms: 10,
 	ctForkHeight: 4294967294,
+	ctForkHeightTestnet: 400,
 	addressPrefix: 111,
 	integratedAddressPrefix: 112,
 	addressPrefixTestnet: 111,

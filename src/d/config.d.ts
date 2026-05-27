@@ -13,6 +13,7 @@ declare var config : {
 	txMinConfirms: number,         // corresponds to CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE in Monero
 	txCoinbaseMinConfirms: number, // corresponds to CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW in Monero
 	ctForkHeight: number,
+	ctForkHeightTestnet: number,
 	coinSymbol: string,
 	openAliasPrefix: string,
 	coinName: string,

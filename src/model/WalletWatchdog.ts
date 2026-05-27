@@ -61,51 +61,57 @@ export class WalletWatchdog {
      * stops dropping those outputs and the user's balance comes back.
      *
      * Runs sequentially to keep node load low; failures are logged and the
-     * pass continues — leftover suspects will simply be re-attempted next
+     * pass continues; leftover suspects will simply be re-attempted next
      * time a watchdog is constructed (e.g. wallet switch).
      */
     healStaleCtOutputs(): Promise<void> {
         if (this.healStaleCtOutputsPromise !== null) return this.healStaleCtOutputsPromise;
         let self = this;
-        let suspects = TransactionsExplorer.findStaleCtSuspectTxs(this.wallet);
-        if (suspects.length === 0) return Promise.resolve();
 
-        console.warn('[wallet] healing ' + suspects.length + ' tx(es) with stale CT outputs:',
-            suspects.map(s => ({hash: s.hash, height: s.height})));
+        this.healStaleCtOutputsPromise = this.explorer.getHeight().catch(function (e: any) {
+            console.warn('[wallet] CT heal: failed to refresh daemon height before scan', e);
+        }).then(function () {
+            let suspects = TransactionsExplorer.findStaleCtSuspectTxs(self.wallet);
+            if (suspects.length === 0) return;
 
-        let healed = 0;
-        let failed = 0;
-        let chain: Promise<any> = Promise.resolve();
-        for (let suspect of suspects) {
-            let s = suspect;
-            chain = chain.then(function () {
-                if (self.stopped) return;
-                return self.explorer.getTransactionsForBlocks(s.height, s.height, /*includeMinerTx*/ true).then(function (rawTxs: any) {
+            console.warn('[wallet] healing ' + suspects.length + ' tx(es) with stale CT outputs:',
+                suspects.map(s => ({hash: s.hash, height: s.height})));
+
+            let healed = 0;
+            let failed = 0;
+            let chain: Promise<any> = Promise.resolve();
+            for (let suspect of suspects) {
+                let s = suspect;
+                chain = chain.then(function () {
                     if (self.stopped) return;
-                    if (!Array.isArray(rawTxs)) return; // 'status' string fallback when block has no txs
-                    for (let rawTx of rawTxs as RawDaemon_Transaction[]) {
-                        if (rawTx.hash !== s.hash) continue;
-                        let parsed = TransactionsExplorer.parse(rawTx, self.wallet);
-                        if (parsed !== null) {
-                            self.wallet.addNew(parsed, /*replace*/ true);
-                            healed++;
-                        } else {
-                            failed++;
-                            console.warn('[wallet] heal: re-parse returned null for ' + s.hash);
+                    return self.explorer.getTransactionsForBlocks(s.height, s.height, /*includeMinerTx*/ true).then(function (rawTxs: any) {
+                        if (self.stopped) return;
+                        if (!Array.isArray(rawTxs)) return; // 'status' string fallback when block has no txs
+                        for (let rawTx of rawTxs as RawDaemon_Transaction[]) {
+                            if (rawTx.hash !== s.hash) continue;
+                            let parsed = TransactionsExplorer.parse(rawTx, self.wallet);
+                            if (parsed !== null) {
+                                self.wallet.addNew(parsed, /*replace*/ true);
+                                healed++;
+                            } else {
+                                failed++;
+                                console.warn('[wallet] heal: re-parse returned null for ' + s.hash);
+                            }
+                            return;
                         }
-                        return;
-                    }
-                    failed++;
-                    console.warn('[wallet] heal: tx ' + s.hash + ' not found at height ' + s.height);
-                }).catch(function (e: any) {
-                    failed++;
-                    console.warn('[wallet] heal: fetch failed for ' + s.hash + ' at height ' + s.height, e);
+                        failed++;
+                        console.warn('[wallet] heal: tx ' + s.hash + ' not found at height ' + s.height);
+                    }).catch(function (e: any) {
+                        failed++;
+                        console.warn('[wallet] heal: fetch failed for ' + s.hash + ' at height ' + s.height, e);
+                    });
                 });
-            });
-        }
+            }
 
-        this.healStaleCtOutputsPromise = chain.then(function () {
-            console.info('[wallet] CT heal pass complete: healed=' + healed + ' failed=' + failed + ' total=' + suspects.length);
+            return chain.then(function () {
+                console.info('[wallet] CT heal pass complete: healed=' + healed + ' failed=' + failed + ' total=' + suspects.length);
+            });
+        }).then(function () {
             self.healStaleCtOutputsPromise = null;
         });
         return this.healStaleCtOutputsPromise;

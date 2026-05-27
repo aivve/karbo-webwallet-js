@@ -1866,6 +1866,7 @@ export namespace CnTransactions{
 		if (tx.version === TRANSACTION_VERSION_CT) {
 			check_ct_array_size(tx.vin.length, CT_MAX_INPUTS, "vin");
 			check_ct_array_size(tx.vout.length, CT_MAX_OUTPUTS, "vout");
+			buf += CnUtils.encode_varint(tx.unlock_time || 0);
 			buf += CnUtils.encode_varint(tx.fee || 0);
 		} else {
 			buf += CnUtils.encode_varint(tx.unlock_time);
