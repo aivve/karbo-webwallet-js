@@ -20,7 +20,7 @@ import {DestructableView} from "../lib/numbersLab/DestructableView";
 import {Constants} from "../model/Constants";
 import {AppState} from "../model/AppState";
 import {Transaction} from "../model/Transaction";
-import {Cn} from "../model/Cn";
+import {Cn, CnTransactions} from "../model/Cn";
 import {BlockchainExplorerProvider} from "../providers/BlockchainExplorerProvider";
 import {BlockchainExplorer, RawDaemon_OutsForAmount} from "../model/blockchain/BlockchainExplorer";
 import {TransactionsExplorer} from "../model/TransactionsExplorer";
@@ -28,6 +28,7 @@ import {WalletWatchdog} from "../model/WalletWatchdog";
 
 let wallet : Wallet = DependencyInjectorInstance().getInstance(Wallet.name,'default', false);
 let blockchainExplorer : BlockchainExplorer = BlockchainExplorerProvider.getInstance();
+const ACCOUNT_REGISTRATION_RING_SIZE = 4;
 
 class AccountView extends DestructableView{
 	@VueVar([]) transactions !: Transaction[];
@@ -171,7 +172,9 @@ class AccountView extends DestructableView{
 			if (result.dismiss) return;
 
 			blockchainExplorer.getHeight().then(function (blockchainHeight: number) {
-				let dustAmount = 1; // minimal amount for self-transfer
+				let dustAmount = TransactionsExplorer.isCtActivated(blockchainHeight) ?
+					parseInt(CnTransactions.ctMinimumDenomination().toString()) :
+					1; // minimal amount for self-transfer
 				let destinationAddress = wallet.getPublicAddress();
 
 				swal({
@@ -182,7 +185,7 @@ class AccountView extends DestructableView{
 					}
 				});
 
-				let mixinToSendWith: number = config.defaultMixin;
+				let mixinToSendWith: number = ACCOUNT_REGISTRATION_RING_SIZE - 1;
 
 				TransactionsExplorer.createTx(
 					[{address: destinationAddress, amount: dustAmount}],

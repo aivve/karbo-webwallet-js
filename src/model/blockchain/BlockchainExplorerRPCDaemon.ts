@@ -128,9 +128,10 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
         }
 
         this.lastTimeRetrieveInfo = Date.now();
-        return this.makeRequest('GET', 'getheight').then((data: any) => {
-            let height = parseInt(data.height);
+        return this.makeRpcRequest('getlastblockheader').then((data: any) => {
+            let height = parseInt(data.block_header['height']);
             this.cacheHeight = height;
+            (<any>config).lastBlockMajorVersion = parseInt(data.block_header['major_version']);
             return height;
         })
     }
@@ -295,6 +296,7 @@ export class BlockchainExplorerRpcDaemon implements BlockchainExplorer {
 
     getNetworkInfo(): Promise<NetworkInfo> {
         return this.makeRpcRequest('getlastblockheader').then((raw: any) => {
+            (<any>config).lastBlockMajorVersion = parseInt(raw.block_header['major_version']);
             //console.log(raw);
             return {
                 'node': config.nodeUrl,//.split(':')[1].replace(/[-[\]\/{}()*+?\\^$|#\s]/g, ''),

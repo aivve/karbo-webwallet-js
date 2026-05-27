@@ -77,8 +77,57 @@ type TxExtra = {
 export class TransactionsExplorer {
 
 	static isCtActivated(blockchainHeight: number): boolean {
+		let lastBlockMajorVersion = parseInt((<any>config).lastBlockMajorVersion || '0');
+		if (lastBlockMajorVersion >= 6) return true;
 		let forkHeight = new JSBigInt(typeof config.ctForkHeight !== 'undefined' ? config.ctForkHeight : '4294967294');
 		return new JSBigInt(blockchainHeight).compare(forkHeight) >= 0;
+	}
+
+	static randomOutAmountForWalletOut(out: RawOutForTx): any {
+		let ringAmount = out.ring_amount || (out.ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : out.amount);
+		return ringAmount === CnTransactions.ctConfidentialOutputAmount() ? CnTransactions.ctConfidentialOutputAmountRpc() : ringAmount;
+	}
+
+	static alignMixOutsWithRequestedAmounts(lotsMixOuts: RawDaemon_OutsForAmount[], requestedAmounts: any[]): RawDaemon_OutsForAmount[] {
+		let groupsByAmount: {[amount: string]: RawDaemon_OutsForAmount[]} = {};
+		for (let group of lotsMixOuts) {
+			let key = CnTransactions.normalizeMixAmount(group.amount);
+			if (typeof groupsByAmount[key] === 'undefined') {
+				groupsByAmount[key] = [];
+			}
+			groupsByAmount[key].push(group);
+		}
+
+		let usedByAmount: {[amount: string]: number} = {};
+		let aligned: RawDaemon_OutsForAmount[] = [];
+		for (let i = 0; i < requestedAmounts.length; ++i) {
+			let key = CnTransactions.normalizeMixAmount(requestedAmounts[i]);
+			let groups = groupsByAmount[key] || [];
+			let selectedGroup: RawDaemon_OutsForAmount | null = null;
+
+			if (groups.length > 0) {
+				let used = usedByAmount[key] || 0;
+				selectedGroup = groups[Math.min(used, groups.length - 1)];
+				usedByAmount[key] = used + 1;
+			} else if (
+				lotsMixOuts.length === requestedAmounts.length &&
+				typeof lotsMixOuts[i] !== 'undefined' &&
+				CnTransactions.normalizeMixAmount(lotsMixOuts[i].amount) === key
+			) {
+				selectedGroup = lotsMixOuts[i];
+			}
+
+			if (selectedGroup === null) {
+				throw 'Random outs missing amount bucket ' + requestedAmounts[i];
+			}
+
+			aligned.push({
+				amount: selectedGroup.amount,
+				outs: (selectedGroup.outs || []).slice()
+			});
+		}
+
+		return aligned;
 	}
 
 	// An output is a "stale CT suspect" when it sits in a CT-era non-coinbase
@@ -837,8 +886,7 @@ export class TransactionsExplorer {
 
 				let amounts: any[] = [];
 				for (let l = 0; l < usingOuts.length; l++) {
-					let ringAmount = usingOuts[l].ring_amount || (usingOuts[l].ctCommitment ? CnTransactions.ctConfidentialOutputAmount() : usingOuts[l].amount);
-					amounts.push(ringAmount === CnTransactions.ctConfidentialOutputAmount() ? CnTransactions.ctConfidentialOutputAmountRpc() : ringAmount);
+					amounts.push(TransactionsExplorer.randomOutAmountForWalletOut(usingOuts[l]));
 				}
 
 				let allInputsAreCoinbase = useCt && usingOuts.length > 0 && usingOuts.every(function(out: RawOutForTx) {
@@ -876,7 +924,11 @@ export class TransactionsExplorer {
 				}
 
 				obtainMixOutsCallback(amounts, nbOutsNeeded).then(function (lotsMixOuts: any[]) {
-					signWithMixins(lotsMixOuts, requestedMixin);
+					try {
+						signWithMixins(TransactionsExplorer.alignMixOutsWithRequestedAmounts(lotsMixOuts, amounts), requestedMixin);
+					} catch (e) {
+						reject(e);
+					}
 				}).catch(function (e) {
 					console.error('Failed to obtain mix outs', e);
 					reject(e);

@@ -1119,6 +1119,15 @@ export namespace CnTransactions{
 		return -1;
 	}
 
+	export function normalizeMixAmount(amount : any) {
+		if (amount === undefined || amount === null) return '';
+		let value = '' + amount;
+		if (value === CT_CONFIDENTIAL_OUTPUT_AMOUNT || value === '-1') {
+			return 'ct';
+		}
+		return new JSBigInt(amount).toString();
+	}
+
 	export function ctMinimumDenomination() {
 		return CT_MIN_DENOMINATION;
 	}
@@ -3575,6 +3584,11 @@ export namespace CnTransactions{
 			let isConfidentialRealOutput = !!(outputs[i].ctCommitment || outputs[i].ctMaskedAmount || outputs[i].commitment || outputs[i].masked_amount);
 			src.ring_amount = outputs[i].ring_amount || outputs[i].ringAmount || (isConfidentialRealOutput ? CT_CONFIDENTIAL_OUTPUT_AMOUNT : src.amount);
 			if (mix_outs.length !== 0) { // if mixin
+				let expectedMixAmount = src.ring_amount === CT_CONFIDENTIAL_OUTPUT_AMOUNT ? CnTransactions.ctConfidentialOutputAmountRpc() : src.ring_amount;
+				if (mix_outs[i].amount !== undefined && CnTransactions.normalizeMixAmount(mix_outs[i].amount) !== CnTransactions.normalizeMixAmount(expectedMixAmount)) {
+					throw "Random outs amount mismatch for input " + i + ": got " + mix_outs[i].amount + ", expected " + expectedMixAmount;
+				}
+
 				// Sort fake outputs by global index
 				console.log('mix outs before sort',mix_outs[i].outs);
 				mix_outs[i].outs.sort(function(a:any, b:any) {
