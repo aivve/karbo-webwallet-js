@@ -81,6 +81,41 @@ export class TransactionsExplorer {
 		return new JSBigInt(blockchainHeight).compare(forkHeight) >= 0;
 	}
 
+	// An output is a "stale CT suspect" when it sits in a CT-era non-coinbase
+	// tx but has none of the CT markers populated. The only way that can
+	// happen today is if it was persisted by an older scanner that decoded the
+	// amount but didn't store ctCommitment/ctMaskedAmount/ctRingAmount.
+	// formatWalletOutsForTx drops these from sends so we don't ship rings the
+	// daemon will reject; healStaleCtOutputs (WalletWatchdog) re-fetches the
+	// parent tx and re-parses it under the current scanner to repopulate them.
+	static isStaleCtOutput(tr: Transaction, out: TransactionOut): boolean {
+		return TransactionsExplorer.isCtActivated(tr.blockHeight)
+			&& !tr.is_coinbase
+			&& out.ctCommitment === ''
+			&& out.ctMaskedAmount === ''
+			&& out.ctRingAmount === '';
+	}
+
+	// Returns one entry per suspect tx (deduped by hash), regardless of how
+	// many suspect outs it contains. Caller uses this to know which raw txs
+	// to re-fetch and re-parse.
+	static findStaleCtSuspectTxs(wallet: Wallet): Array<{hash: string, height: number}> {
+		let seen: {[k: string]: boolean} = {};
+		let suspects: Array<{hash: string, height: number}> = [];
+		for (let tr of wallet.getAll()) {
+			if (tr.hash === '' || tr.blockHeight <= 0) continue;
+			if (seen[tr.hash]) continue;
+			for (let out of tr.outs) {
+				if (TransactionsExplorer.isStaleCtOutput(tr, out)) {
+					seen[tr.hash] = true;
+					suspects.push({hash: tr.hash, height: tr.blockHeight});
+					break;
+				}
+			}
+		}
+		return suspects;
+	}
+
 	static parseExtra(oExtra: number[]): TxExtra[] {
 		let extra = oExtra.slice();
 		let extras: TxExtra[] = [];
@@ -525,21 +560,13 @@ export class TransactionsExplorer {
 				continue;
 			}
 
-			let txIsCtEra = TransactionsExplorer.isCtActivated(tr.blockHeight);
-
 			for (let out of tr.outs) {
 
-				if (
-					txIsCtEra
-					&& !tr.is_coinbase
-					&& out.ctCommitment === ''
-					&& out.ctMaskedAmount === ''
-					&& out.ctRingAmount === ''
-				) {
-					// CT-era, non-coinbase output with no CT markers — almost
-					// certainly a confidential output scanned before the wallet
-					// knew about CT fields. globalIndex points into the CT
-					// bucket, not the amount bucket implied by `amount`.
+				if (TransactionsExplorer.isStaleCtOutput(tr, out)) {
+					// globalIndex points into the CT bucket, not the amount
+					// bucket implied by `amount`. WalletWatchdog.healStaleCtOutputs
+					// re-fetches the parent tx in the background; until then we
+					// skip the output so we don't ship a daemon-rejecting ring.
 					staleCtSuspects.push({
 						hash: tr.hash,
 						height: tr.blockHeight,

@@ -45,6 +45,70 @@ export class WalletWatchdog {
 
         this.initWorker();
         this.initMempool();
+        // Background, fire-and-forget. Errors are logged inside.
+        this.healStaleCtOutputs();
+    }
+
+    private healStaleCtOutputsPromise: Promise<void> | null = null;
+
+    /**
+     * One-shot, deduped (per WalletWatchdog instance) repair pass: for every
+     * stored tx that contains a CT-era output without CT markers, re-fetch the
+     * raw tx from the daemon and re-parse it with the current CT-aware
+     * scanner. The re-parsed Transaction replaces the old one via
+     * Wallet.addNew(replace=true), repopulating ctCommitment / ctMaskedAmount
+     * / ctBlinding / ctRingAmount. After this completes, formatWalletOutsForTx
+     * stops dropping those outputs and the user's balance comes back.
+     *
+     * Runs sequentially to keep node load low; failures are logged and the
+     * pass continues — leftover suspects will simply be re-attempted next
+     * time a watchdog is constructed (e.g. wallet switch).
+     */
+    healStaleCtOutputs(): Promise<void> {
+        if (this.healStaleCtOutputsPromise !== null) return this.healStaleCtOutputsPromise;
+        let self = this;
+        let suspects = TransactionsExplorer.findStaleCtSuspectTxs(this.wallet);
+        if (suspects.length === 0) return Promise.resolve();
+
+        console.warn('[wallet] healing ' + suspects.length + ' tx(es) with stale CT outputs:',
+            suspects.map(s => ({hash: s.hash, height: s.height})));
+
+        let healed = 0;
+        let failed = 0;
+        let chain: Promise<any> = Promise.resolve();
+        for (let suspect of suspects) {
+            let s = suspect;
+            chain = chain.then(function () {
+                if (self.stopped) return;
+                return self.explorer.getTransactionsForBlocks(s.height, s.height, /*includeMinerTx*/ true).then(function (rawTxs: any) {
+                    if (self.stopped) return;
+                    if (!Array.isArray(rawTxs)) return; // 'status' string fallback when block has no txs
+                    for (let rawTx of rawTxs as RawDaemon_Transaction[]) {
+                        if (rawTx.hash !== s.hash) continue;
+                        let parsed = TransactionsExplorer.parse(rawTx, self.wallet);
+                        if (parsed !== null) {
+                            self.wallet.addNew(parsed, /*replace*/ true);
+                            healed++;
+                        } else {
+                            failed++;
+                            console.warn('[wallet] heal: re-parse returned null for ' + s.hash);
+                        }
+                        return;
+                    }
+                    failed++;
+                    console.warn('[wallet] heal: tx ' + s.hash + ' not found at height ' + s.height);
+                }).catch(function (e: any) {
+                    failed++;
+                    console.warn('[wallet] heal: fetch failed for ' + s.hash + ' at height ' + s.height, e);
+                });
+            });
+        }
+
+        this.healStaleCtOutputsPromise = chain.then(function () {
+            console.info('[wallet] CT heal pass complete: healed=' + healed + ' failed=' + failed + ' total=' + suspects.length);
+            self.healStaleCtOutputsPromise = null;
+        });
+        return this.healStaleCtOutputsPromise;
     }
 
     private defaultNodeUrl: string | null = null;
