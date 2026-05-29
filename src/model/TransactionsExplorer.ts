@@ -45,7 +45,10 @@ export const TX_EXTRA_TAG_PADDING = 0x00;
 export const TX_EXTRA_TAG_PUBKEY = 0x01;
 export const TX_EXTRA_NONCE = 0x02;
 export const TX_EXTRA_MERGE_MINING_TAG = 0x03;
-export const TX_EXTRA_TAG_ADDITIONAL_PUBKEYS = 0x04;
+// Karbo reuses tag 0x04 for account registration (04 <spendPub:32> <viewPub:32>).
+// Monero's "additional pubkeys" meaning of 0x04 is a subaddress feature Karbo
+// never emits, so it is intentionally not supported here.
+export const TX_EXTRA_TAG_ACCOUNT_REGISTRATION = 0x04;
 export const TX_EXTRA_MYSTERIOUS_MINERGATE_TAG = 0xDE;
 
 
@@ -192,9 +195,16 @@ export class TransactionsExplorer {
 				extraSize = 32;
 				startOffset = 1;
 				hasFoundPubKey = true;
-			} else if (extra[0] === TX_EXTRA_TAG_ADDITIONAL_PUBKEYS) {
-				extraSize = extra[1] * 32;
-				startOffset = 2;
+			} else if (extra[0] === TX_EXTRA_TAG_ACCOUNT_REGISTRATION) {
+				// Karbo account registration: 04 <spendPub:32> <viewPub:32>.
+				// Fixed 64-byte payload, no count byte. Skipping it cleanly lets
+				// the loop reach the 0x01 tx pubkey regardless of tag order
+				// (construct_ct_tx emits 04 before 01); the old additional-pubkeys
+				// reading misread spendPub[0] as a key count, overran the buffer,
+				// never found the pubkey, and parse() dropped the whole tx -
+				// hiding the spend and inflating the balance.
+				extraSize = 64;
+				startOffset = 1;
 			} else if (extra[0] === TX_EXTRA_TAG_PADDING) {
 
 				// this tag has to be the last in extra
