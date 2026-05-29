@@ -69,47 +69,128 @@ export class WalletWatchdog {
         let self = this;
 
         this.healStaleCtOutputsPromise = this.explorer.getHeight().catch(function (e: any) {
-            console.warn('[wallet] CT heal: failed to refresh daemon height before scan', e);
+            console.warn('[ct-heal] failed to refresh daemon height before scan', e);
         }).then(function () {
-            let suspects = TransactionsExplorer.findStaleCtSuspectTxs(self.wallet);
-            if (suspects.length === 0) return;
+            // Snapshot the runtime context so the user (or we) can see at a
+            // glance whether CT detection is even on. Without this it was
+            // impossible to tell the difference between "heal ran and found
+            // nothing" and "heal ran but CT detection was off".
+            let lastMajor = (<any>config).lastBlockMajorVersion;
+            let ctForkHeight = (<any>config).ctForkHeight;
+            let ctForkHeightTestnet = (<any>config).ctForkHeightTestnet;
+            console.info('[ct-heal] runtime: lastBlockMajorVersion=' + lastMajor +
+                ' ctForkHeight=' + ctForkHeight +
+                ' ctForkHeightTestnet=' + ctForkHeightTestnet +
+                ' walletLastHeight=' + self.wallet.lastHeight +
+                ' txCount=' + self.wallet.getAll().length);
 
-            console.warn('[wallet] healing ' + suspects.length + ' tx(es) with stale CT outputs:',
+            let suspects = TransactionsExplorer.findStaleCtSuspectTxs(self.wallet);
+            if (suspects.length === 0) {
+                console.info('[ct-heal] no suspect txs found - nothing to do');
+                return;
+            }
+
+            console.warn('[ct-heal] queued ' + suspects.length + ' tx(es) for re-fetch:',
                 suspects.map(s => ({hash: s.hash, height: s.height})));
 
             let healed = 0;
+            let healedNoChange = 0;
             let failed = 0;
             let chain: Promise<any> = Promise.resolve();
             for (let suspect of suspects) {
                 let s = suspect;
                 chain = chain.then(function () {
                     if (self.stopped) return;
+
+                    // Snapshot the pre-heal state of every out in this tx so we
+                    // can compare against the post-heal state. If nothing
+                    // changed after `addNew(replace=true)`, we know the
+                    // re-parse produced an identical-looking output - i.e.
+                    // either the daemon's response is missing the CT fields
+                    // or parse() is taking a path that doesn't populate them.
+                    let priorTx = self.wallet.findWithTxHash(s.hash);
+                    let priorOuts = priorTx ? priorTx.outs.map(o => ({
+                        outputIdx: o.outputIdx,
+                        globalIndex: o.globalIndex,
+                        amount: o.amount,
+                        ctCommitment: !!o.ctCommitment,
+                        ctMaskedAmount: !!o.ctMaskedAmount,
+                        ctBlinding: !!o.ctBlinding,
+                        ctRingAmount: !!o.ctRingAmount,
+                    })) : [];
+
                     return self.explorer.getTransactionsForBlocks(s.height, s.height, /*includeMinerTx*/ true).then(function (rawTxs: any) {
                         if (self.stopped) return;
-                        if (!Array.isArray(rawTxs)) return; // 'status' string fallback when block has no txs
-                        for (let rawTx of rawTxs as RawDaemon_Transaction[]) {
-                            if (rawTx.hash !== s.hash) continue;
-                            let parsed = TransactionsExplorer.parse(rawTx, self.wallet);
-                            if (parsed !== null) {
-                                self.wallet.addNew(parsed, /*replace*/ true);
-                                healed++;
-                            } else {
-                                failed++;
-                                console.warn('[wallet] heal: re-parse returned null for ' + s.hash);
-                            }
+                        if (!Array.isArray(rawTxs)) {
+                            failed++;
+                            console.warn('[ct-heal] block ' + s.height + ' returned non-array:', rawTxs);
                             return;
                         }
-                        failed++;
-                        console.warn('[wallet] heal: tx ' + s.hash + ' not found at height ' + s.height);
+                        let matched: RawDaemon_Transaction | null = null;
+                        for (let rawTx of rawTxs as RawDaemon_Transaction[]) {
+                            if (rawTx.hash === s.hash) { matched = rawTx; break; }
+                        }
+                        if (matched === null) {
+                            failed++;
+                            console.warn('[ct-heal] tx ' + s.hash + ' not present in block ' + s.height +
+                                '; daemon returned hashes:', rawTxs.map((t: any) => t.hash));
+                            return;
+                        }
+                        let parsed = TransactionsExplorer.parse(matched, self.wallet);
+                        if (parsed === null) {
+                            failed++;
+                            console.warn('[ct-heal] re-parse returned null for ' + s.hash +
+                                ' (version=' + matched.version + ', vout.length=' + (matched.vout || []).length + ')');
+                            return;
+                        }
+                        let parsedOuts = parsed.outs.map(o => ({
+                            outputIdx: o.outputIdx,
+                            globalIndex: o.globalIndex,
+                            amount: o.amount,
+                            ctCommitment: !!o.ctCommitment,
+                            ctMaskedAmount: !!o.ctMaskedAmount,
+                            ctBlinding: !!o.ctBlinding,
+                            ctRingAmount: !!o.ctRingAmount,
+                        }));
+                        self.wallet.addNew(parsed, /*replace*/ true);
+                        // Re-fetch from the wallet to confirm the swap actually
+                        // landed (e.g. catches the case where txPubKey mismatch
+                        // prevented `addNew` from doing the assignment).
+                        let postTx = self.wallet.findWithTxHash(s.hash);
+                        let postOuts = postTx ? postTx.outs.map(o => ({
+                            outputIdx: o.outputIdx,
+                            globalIndex: o.globalIndex,
+                            amount: o.amount,
+                            ctCommitment: !!o.ctCommitment,
+                            ctMaskedAmount: !!o.ctMaskedAmount,
+                            ctBlinding: !!o.ctBlinding,
+                            ctRingAmount: !!o.ctRingAmount,
+                        })) : [];
+                        let stillStale = postTx ? postTx.outs.some(o => TransactionsExplorer.isStaleCtOutput(postTx as any, o)) : false;
+                        if (stillStale) {
+                            healedNoChange++;
+                            console.warn('[ct-heal] ' + s.hash + ' re-parsed but outputs are STILL stale after addNew(replace=true).' +
+                                ' prior=' + JSON.stringify(priorOuts) +
+                                ' parsed=' + JSON.stringify(parsedOuts) +
+                                ' post=' + JSON.stringify(postOuts) +
+                                ' priorTxPubKey=' + (priorTx ? priorTx.txPubKey : '(none)') +
+                                ' parsedTxPubKey=' + parsed.txPubKey);
+                        } else {
+                            healed++;
+                            console.info('[ct-heal] healed ' + s.hash + ' (' + parsed.outs.length + ' out(s) repopulated)');
+                        }
                     }).catch(function (e: any) {
                         failed++;
-                        console.warn('[wallet] heal: fetch failed for ' + s.hash + ' at height ' + s.height, e);
+                        console.warn('[ct-heal] fetch failed for ' + s.hash + ' at height ' + s.height, e);
                     });
                 });
             }
 
             return chain.then(function () {
-                console.info('[wallet] CT heal pass complete: healed=' + healed + ' failed=' + failed + ' total=' + suspects.length);
+                console.info('[ct-heal] pass complete: healed=' + healed +
+                    ' stillStale=' + healedNoChange +
+                    ' failed=' + failed +
+                    ' total=' + suspects.length);
             });
         }).then(function () {
             self.healStaleCtOutputsPromise = null;
