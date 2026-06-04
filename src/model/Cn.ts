@@ -670,8 +670,8 @@ export namespace CnNativeBride{
 	}
 
 	// scalar^(L−2) mod L  →  the multiplicative inverse via Fermat's little
-	// theorem. Only needed in the Triptych prover (the f_U response carries
-	// x⁻¹ so that the U-ring equation closes against the key image base I).
+	// theorem. (No longer used by the Triptych prover: the Route 1 linking
+	// track J = x·U reuses f_P and needs no x⁻¹. Kept as a general utility.)
 	// L − 2 is hard-coded little-endian so the JS bignum layer doesn't have
 	// to know about the Ed25519 group order.
 	export function sc_invert(scalar : string) : string {
@@ -1141,6 +1141,25 @@ export namespace CnTransactions{
 			pedersenHCache = CnNativeBride.hash_to_ec_2_data(CnUtils.bintohex("CN-amount-generator"));
 		}
 		return pedersenHCache;
+	}
+
+	let keyimageUCache : string | null = null;
+
+	// Fixed linking-tag generator U for the CT key image J = x·U. NUMS
+	// hash-to-point of a domain string; mirrors keyimage_generator_U() in the
+	// daemon's src/crypto/triptych.cpp. dlog wrt G and H is unknown.
+	export function keyimageGeneratorU() {
+		if (keyimageUCache === null) {
+			keyimageUCache = CnNativeBride.hash_to_ec_2_data(CnUtils.bintohex("Karbo-CT-keyimage-generator-v1"));
+		}
+		return keyimageUCache;
+	}
+
+	// Canonical CT key image J = x·U (mirrors triptych_key_image() in the
+	// daemon). Used for ConfidentialInput.k_image and bound to x by the
+	// Triptych linking track. Transparent KeyInput spends keep legacy x·Hp(P).
+	export function triptych_key_image(spendPrivkey : string) : string {
+		return CnUtils.ge_scalarmult(CnTransactions.keyimageGeneratorU(), spendPrivkey);
 	}
 
 	export function scalar_one() {
@@ -1615,23 +1634,22 @@ export namespace CnTransactions{
 
 	// Triptych spend proof. Vector lengths follow the on-wire rule:
 	//   n ∈ {2, 3, 4} (ring sizes 4 / 8 / 16, full Triptych)
-	//     I_bits, A, B, Q_P, Q_M, Q_U, z, za, zb : n entries each
-	// f_P, f_M, f_U are always present. n=0 / n=1 are reserved as invalid
-	// (the old n=0 Schnorr branch for ring size 1 was unsound and removed
-	// from consensus; coinbase shielding goes through v2 KeyInput now).
+	//     I_bits, A, B, Q_P, Q_M, Q_J, z, za, zb : n entries each
+	// f_P, f_M are always present (no separate image response — the linking
+	// track reuses f_P, binding the key image J = x·U to the spend key).
+	// n=0 / n=1 are reserved as invalid.
 	export type CTInputSignature = {
 		I_bits:string[],
 		A:string[],
 		B:string[],
 		Q_P:string[],
 		Q_M:string[],
-		Q_U:string[],
+		Q_J:string[],
 		z:string[],
 		za:string[],
 		zb:string[],
 		f_P:string,
-		f_M:string,
-		f_U:string
+		f_M:string
 	};
 
 	export type CTOutputProof = {
@@ -1803,9 +1821,9 @@ export namespace CnTransactions{
 	}
 
 	// Serialize one Triptych proof body. Header byte n ∈ {2,3,4} (ring 4/8/16)
-	// followed by 9 × n point/scalar arrays and 3 final scalars. Empty-slot
-	// signalling for v2 KeyInput slots is now done at the Transaction level
-	// via the per-input variant — no n=0xFF sentinel here.
+	// followed by 6 × n point arrays + 3 × n scalar arrays and 2 final scalars
+	// (f_P, f_M). Empty-slot signalling for v2 KeyInput slots is done at the
+	// Transaction level via the per-input variant — no n=0xFF sentinel here.
 	function serialize_ct_input_sig(sig : CTInputSignature) : string {
 		let nBits = sig.I_bits.length;
 		let nQ = sig.Q_P.length;
@@ -1813,7 +1831,7 @@ export namespace CnTransactions{
 			throw "Triptych: invalid proof shape on serialize (n_bits=" + nBits + ", n_q=" + nQ + ")";
 		}
 		if (sig.A.length    !== nBits || sig.B.length    !== nBits ||
-		    sig.Q_M.length  !== nBits || sig.Q_U.length  !== nBits ||
+		    sig.Q_M.length  !== nBits || sig.Q_J.length  !== nBits ||
 		    sig.z.length    !== nBits || sig.za.length   !== nBits || sig.zb.length !== nBits) {
 			throw "Triptych: vector length mismatch on serialize";
 		}
@@ -1823,13 +1841,12 @@ export namespace CnTransactions{
 		for (let p of sig.B)      buf += p;
 		for (let p of sig.Q_P)    buf += p;
 		for (let p of sig.Q_M)    buf += p;
-		for (let p of sig.Q_U)    buf += p;
+		for (let p of sig.Q_J)    buf += p;
 		for (let s of sig.z)      buf += s;
 		for (let s of sig.za)     buf += s;
 		for (let s of sig.zb)     buf += s;
 		buf += sig.f_P;
 		buf += sig.f_M;
-		buf += sig.f_U;
 		return buf;
 	}
 
@@ -2221,7 +2238,7 @@ export namespace CnTransactions{
 	// Canonical Fiat-Shamir transcript serialization. Matches the C++ daemon's
 	// compute_challenge byte-for-byte: domain || message || ring_size_byte ||
 	// every ring pubkey || every ring commit || pseudo || key image ||
-	// I_bits/A/B (n_bits each) || Q_P/Q_M/Q_U (n_q each). Single funnel —
+	// I_bits/A/B (n_bits each) || Q_P/Q_M/Q_J (n_q each). Single funnel —
 	// no ad-hoc hashing at call sites.
 	export function triptych_challenge(
 		message : string,
@@ -2235,13 +2252,14 @@ export namespace CnTransactions{
 		B : string[],
 		Q_P : string[],
 		Q_M : string[],
-		Q_U : string[]
+		Q_J : string[]
 	) : string {
 		// Domain separator distinct from GK ("GK-KarboCT-v2") and MLSAG
-		// ("MLSAG-KarboCT-v1"); see triptych.h.
-		let buf = CnUtils.bintohex("Triptych-KarboCT-v1");
+		// ("MLSAG-KarboCT-v1"); see triptych.h. Bumped to v2 for the
+		// fixed-generator key image (J = x·U) linking-track change.
+		let buf = CnUtils.bintohex("Triptych-KarboCT-v2");
 		buf += message;
-		// One-byte ring size header. ringSize ∈ {1, 4, 8, 16} → "01"/"04"/"08"/"10".
+		// One-byte ring size header. ringSize ∈ {4, 8, 16} → "04"/"08"/"10".
 		buf += ("00" + ringSize.toString(16)).slice(-2);
 		for (let pk of ringPubkeys) buf += pk;
 		for (let c of ringCommitments) buf += c;
@@ -2252,7 +2270,7 @@ export namespace CnTransactions{
 		for (let p of B)      buf += p;
 		for (let p of Q_P)    buf += p;
 		for (let p of Q_M)    buf += p;
-		for (let p of Q_U)    buf += p;
+		for (let p of Q_J)    buf += p;
 		return Cn.hash_to_scalar(buf);
 	}
 
@@ -2284,15 +2302,14 @@ export namespace CnTransactions{
 		// Blinding-difference witness  z = r_real − r_pseudo.
 		let zWitness = CnNativeBride.sc_sub(realBlinding, pseudoBlinding);
 
-		// Derived rings: M_k = C_k − C', U_k = Hp(P_k). Both verifier and
-		// prover can recompute these from the public ring; we cache them
-		// once per proof.
+		// Derived M-ring: M_k = C_k − C'. The linking track no longer uses a
+		// per-key U_k = Hp(P_k) ring; it uses the single fixed generator U
+		// with the spend response f_P (key image J = x·U).
 		let M : string[] = [];
-		let U : string[] = [];
 		for (let k = 0; k < ringSize; ++k) {
 			M.push(CnUtils.ge_sub(ringCommitments[k], pseudoCommitment));
-			U.push(CnNativeBride.hash_to_ec_2(ringPubkeys[k]));
 		}
+		let Ugen = CnTransactions.keyimageGeneratorU();
 
 		// Ring size 1 used to take a Schnorr-branch carve-out here, but
 		// the simpler "two independent Schnorr proofs" shape did not bind
@@ -2342,42 +2359,39 @@ export namespace CnTransactions{
 		// degree-n coefficient is absorbed into f_R below).
 		let polyCoeffs = CnTransactions.triptych_compute_poly_coeffs(bits, aj, n, ringSize);
 
-		// Q polynomials for the three rings. Blinding bases:
+		// Q polynomials. Bases:
 		//   Q_P[m] = ρ_P[m]·G + Σ_k p_{k,m}·P_k   (P-ring, base G)
 		//   Q_M[m] = ρ_M[m]·G + Σ_k p_{k,m}·M_k   (M-ring, base G)
-		//   Q_U[m] = σ_U[m]·I + Σ_k p_{k,m}·U_k   (U-ring, base I — the
-		//                                          Triptych trick that lets
-		//                                          the response carry x⁻¹)
+		//   Q_J[m] = ρ_P[m]·U                      (linking track — REUSES ρ_P[m])
+		// Reusing ρ_P[m] (not a fresh σ) is what binds the key image to the
+		// spend key: the same blinding appears in Q_P (G-base) and Q_J (U-base),
+		// and the SAME f_P response closes both, forcing J = x·U.
 		let rhoP : string[] = [];
 		let rhoM : string[] = [];
-		let sigmaU : string[] = [];
 		let Q_P : string[] = [];
 		let Q_M : string[] = [];
-		let Q_U : string[] = [];
+		let Q_J : string[] = [];
 		for (let m = 0; m < n; ++m) {
 			rhoP[m] = CnRandom.random_scalar();
 			rhoM[m] = CnRandom.random_scalar();
-			sigmaU[m] = CnRandom.random_scalar();
 			let sumP = CnUtils.ge_scalarmult_base(rhoP[m]);
 			let sumM = CnUtils.ge_scalarmult_base(rhoM[m]);
-			let sumU = CnUtils.ge_scalarmult(keyImage, sigmaU[m]);
 			for (let k = 0; k < ringSize; ++k) {
 				let coeff = polyCoeffs[k][m];
 				if (CnTransactions.is_zero_scalar(coeff)) continue;
 				sumP = CnUtils.ge_add(sumP, CnUtils.ge_scalarmult(ringPubkeys[k], coeff));
 				sumM = CnUtils.ge_add(sumM, CnUtils.ge_scalarmult(M[k], coeff));
-				sumU = CnUtils.ge_add(sumU, CnUtils.ge_scalarmult(U[k], coeff));
 			}
 			Q_P[m] = sumP;
 			Q_M[m] = sumM;
-			Q_U[m] = sumU;
+			Q_J[m] = CnUtils.ge_scalarmult(Ugen, rhoP[m]);   // ρ_P[m]·U
 		}
 
 		// Fiat-Shamir challenge.
 		let x_chal = CnTransactions.triptych_challenge(
 			message, ringSize, ringPubkeys, ringCommitments,
 			pseudoCommitment, keyImage,
-			I_bits, A, B, Q_P, Q_M, Q_U);
+			I_bits, A, B, Q_P, Q_M, Q_J);
 
 		// Bit-commitment responses.
 		let z : string[] = [];
@@ -2396,27 +2410,22 @@ export namespace CnTransactions{
 			xPow[i] = CnNativeBride.sc_mul(xPow[i - 1], x_chal);
 		}
 
-		// Final responses:
-		//   f_P = x · x_chal^n − Σ_m ρ_P[m]·x_chal^m
+		// Final responses (no separate image response — the linking equation
+		// reuses f_P):
+		//   f_P = x · x_chal^n − Σ_m ρ_P[m]·x_chal^m   (also closes the linking eq)
 		//   f_M = z · x_chal^n − Σ_m ρ_M[m]·x_chal^m
-		//   f_U = x⁻¹ · x_chal^n − Σ_m σ_U[m]·x_chal^m
-		// f_U is the only place x⁻¹ enters the protocol — one Fermat
-		// inversion per proof, no leak through the verifier's algebra.
-		let xInv = CnNativeBride.sc_invert(spendPrivkey);
 		let f_P = CnNativeBride.sc_mul(spendPrivkey, xPow[n]);
 		let f_M = CnNativeBride.sc_mul(zWitness, xPow[n]);
-		let f_U = CnNativeBride.sc_mul(xInv, xPow[n]);
 		for (let m = 0; m < n; ++m) {
 			f_P = CnNativeBride.sc_sub(f_P, CnNativeBride.sc_mul(rhoP[m], xPow[m]));
 			f_M = CnNativeBride.sc_sub(f_M, CnNativeBride.sc_mul(rhoM[m], xPow[m]));
-			f_U = CnNativeBride.sc_sub(f_U, CnNativeBride.sc_mul(sigmaU[m], xPow[m]));
 		}
 
 		return {
 			I_bits, A, B,
-			Q_P, Q_M, Q_U,
+			Q_P, Q_M, Q_J,
 			z, za, zb,
-			f_P, f_M, f_U
+			f_P, f_M
 		};
 	}
 
@@ -3047,13 +3056,16 @@ export namespace CnTransactions{
 				pseudoBlindings.push(pseudoBlinding);
 				pseudoCommitments.push(pseudoCommitment);
 
+				// CT key image is J = x·U (fixed generator), bound to x by the
+				// Triptych linking track — NOT the legacy x·Hp(P) in
+				// sources[i].key_image (that stays for transparent KeyInput).
 				tx.vin.push({
 					type: "confidential_input",
 					ring_members: ringMembers,
 					ring_pubkeys: ringPubkeys,
 					ring_commits: ringCommits,
 					pseudo_commit: pseudoCommitment,
-					k_image: sources[i].key_image
+					k_image: CnTransactions.triptych_key_image(sources[i].in_ephemeral.sec)
 				});
 			}
 		}
